@@ -5,11 +5,11 @@
 int main(void){
   Dict *dict = dict_create(100);
 
-  int prova = 4;
+  int r = dict_put_string(dict, "b", "ciao");
 
-  int a = dict_put_int(dict, "a", 5);
+  DictValue *str = malloc(sizeof(*str));
+  dict_get(dict, "b", str);
 
-  dict_cleanup(dict);
   dict_destroy(dict);
 
   return 0;

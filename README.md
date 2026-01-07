@@ -194,12 +194,6 @@ Any implementation must adhere to this contract to be considered correct.
 
 
 Todo:
-- 🔴 high impact features or improvements or bug fixes should be prioritized.
-- 🟠 medium-high general improvements to code quality, usability, performance and testing.
-- 🟡 medium features, improvement or refactoring.
-- 🟢 low urgency features, minor tweaks, documentation updates.
-- 🔵 funny little things.
-
 - 🔴 [dict.c] review entire file logic, ask to llm what he thinks.
 - 🔴 [dict.c, Dict] implement a proper resizing strategy for the hash table when load factor > 0.7.
 - 🔴 [dict.c, Dict] change the 'put' logic, it should handle occupancy properly.

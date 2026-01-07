@@ -10,11 +10,13 @@ long hash_ascii(const char *key, const size_t size){
     return k % size;
 }
 
-long hash_djb2(const char *key, const size_t size) {
-    long h = HASH_MAGIC_N;
+long hash_djb2(const char *str, const size_t size){
+    unsigned long hash = HASH_MAGIC_N;
+    int c;
 
-    for (size_t i = 0; i < size; i++)
-        h = ((h << 5) + h) + key[i];
+    while ((c = (unsigned char)*str++)) {
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    }
 
-    return h % size;
+    return hash % size;
 }

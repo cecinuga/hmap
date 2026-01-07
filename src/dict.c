@@ -51,10 +51,13 @@ static int dict_put(Dict *dict, char *key, DictValue *item){
 }
 
 /* Creates a new dictionary with a fixed capacity.
-- `capacity` > 0
-- Pointer to a valid `Dict` on success, `NULL` on allocation failure
-- Caller owns the returned dictionary */
+ * - `capacity` > 0
+ * - Pointer to a valid `Dict` on success, `NULL` on allocation failure
+ * - Caller owns the returned dictionary. */
 Dict *dict_create(size_t capacity){
+    assert(capacity > 0);
+    if(capacity <= 0) return NULL;
+
     Dict *d = malloc(sizeof(Dict));
 
     d->size = 0;
@@ -66,14 +69,13 @@ Dict *dict_create(size_t capacity){
 }
 
 /* Inserts a key → value pair into the dictionary.
-
-- `dict` must not be `NULL`
-- `key` must not be `NULL` and must be a null-terminated string
-- The key is copied internally
-- The value is copied internally
-- If a collision occurs, insertion fails
-- Returns `1` on successful insertion, `0` on failure (collision, invalid input, allocation failure)
-- The caller retains ownership of `key` */
+ * - `dict` must not be `NULL`
+ * - `key` must not be `NULL` and must be a null-terminated string
+ * - The key is copied internally
+ * - The value is copied internally
+ * - If a collision occurs, insertion fails
+ * - Returns `1` on successful insertion, `0` on failure (collision, invalid input, allocation failure)
+ * - The caller retains ownership of `key`. */
 int dict_put_int(Dict *dict, char *key, int val){
     assert(dict);
 
@@ -88,14 +90,13 @@ int dict_put_int(Dict *dict, char *key, int val){
 }
 
 /* Inserts a key → value pair into the dictionary.
-
-- `dict` must not be `NULL`
-- `key` must not be `NULL` and must be a null-terminated string
-- The key is copied internally
-- The value is copied internally
-- If a collision occurs, insertion fails
-- Returns `1` on successful insertion, `0` on failure (collision, invalid input, allocation failure)
-- The caller retains ownership of `key` */
+ * - `dict` must not be `NULL`
+ * - `key` must not be `NULL` and must be a null-terminated string
+ * - The key is copied internally
+ * - The value is copied internally
+ * - If a collision occurs, insertion fails
+ * - Returns `1` on successful insertion, `0` on failure (collision, invalid input, allocation failure)
+ * - The caller retains ownership of `key`. */
 int dict_put_double(Dict *dict, char *key, double val){
     assert(dict);
 
@@ -110,23 +111,22 @@ int dict_put_double(Dict *dict, char *key, double val){
 }
 
 /* Inserts a key → value pair into the dictionary.
-
-- `dict` must not be `NULL`
-- `key` must not be `NULL` and must be a null-terminated string
-- The key is copied internally
-- The value is copied internally
-- If a collision occurs, insertion fails
-- Returns `1` on successful insertion, `0` on failure (collision, invalid input, allocation failure)
-- The caller retains ownership of `key` */
+ * - `dict` must not be `NULL`
+ * - `key` must not be `NULL` and must be a null-terminated string
+ * - The key is copied internally
+ * - The value is copied internally
+ * - If a collision occurs, insertion fails
+ * - Returns `1` on successful insertion, `0` on failure (collision, invalid input, allocation failure)
+ * - The caller retains ownership of `key`. */
 int dict_put_string(Dict *dict, char *key, char *val){
     assert(dict);
 
-    char *newkey = malloc(sizeof(char*)); 
-    strcpy(newkey, key); // copy the key so caller retains ownership of the original key string
-    
+    char *newkey = strdup(key); // copy the key so caller retains ownership of the original key string
+    char *newVal = strdup(val);
+
     DictValue *dval = malloc(sizeof(*dval));
     dval->type = DICT_STRING;
-    dval->s = val;
+    dval->s = newVal;
 
     int res = dict_put(dict, newkey, dval);
     if(!res) free(dval);
@@ -135,16 +135,16 @@ int dict_put_string(Dict *dict, char *key, char *val){
 }
 
 /* Retrieves the value associated with a key without removing it.
-- `dict`, `key`, `out` must not be `NULL`
-- If the key exists, `out` is written
-- If the key does not exist, `out` is not modified
-- Returns `1` if the key was found, `0` if the key was not found or on error*/
+ * - `dict`, `key`, `out` must not be `NULL`
+ * - If the key exists, `out` is written
+ * - If the key does not exist, `out` is not modified
+ * - Returns `1` if the key was found, `0` if the key was not found or on error*/
 int dict_get(Dict *dict, char *key, DictValue *out){
     long k = dict->hfn(key, dict->capacity);
 
     if (!dict->entries[k])
         return 0;
-
+    
     if (strcmp(dict->entries[k]->key, key) != 0)
         return 0;
 
@@ -153,13 +153,13 @@ int dict_get(Dict *dict, char *key, DictValue *out){
 }
 
 /* Retrieves and removes the value associated with a key.
-- `dict`, `key`, `out` must not be `NULL`
-- If the key exists:
-- - The value is copied into `out`
-- - The entry is removed from the dictionary
-- If the key does not exist:
-- - No state change occurs
-- Returns `1` if the element was removed, `0` if the key was not found or on error*/
+ * - `dict`, `key`, `out` must not be `NULL`
+ * - If the key exists:
+ * - - The value is copied into `out`
+ * - - The entry is removed from the dictionary
+ * - If the key does not exist:
+ * - - No state change occurs
+ * - Returns `1` if the element was removed, `0` if the key was not found or on error*/
 int dict_take(Dict *dict, char *key, DictValue *out){
     long k = dict->hfn(key, dict->capacity);
 
@@ -181,11 +181,12 @@ int dict_take(Dict *dict, char *key, DictValue *out){
 }
 
 /* Removes all entries from the dictionary.
-- Frees all internal entries
-- The dictionary remains valid and reusable */
+ * - Frees all internal entries
+ * - The dictionary remains valid and reusable */
 void dict_cleanup(Dict *dict){
     assert(dict);
-    if(is_empty(dict)) return;
+    if(is_empty(dict)) 
+        return;
 
     for(size_t i = 0; i < dict->capacity; i++){
         if (!dict->entries[i])
@@ -199,8 +200,8 @@ void dict_cleanup(Dict *dict){
 }
 
 /* Destroys the dictionary and releases all associated resources.
-- Frees all internal memory
-- After this call, the dictionary pointer is invalid*/
+ * - Frees all internal memory
+ * - After this call, the dictionary pointer is invalid*/
 void dict_destroy(Dict *dict){        
     assert(dict);
     dict_cleanup(dict);

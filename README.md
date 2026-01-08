@@ -197,4 +197,5 @@ Todo:
 - 🔴 [dict.c] review entire file logic, ask to llm what he thinks.
 - 🔴 [dict.c, Dict] implement a proper resizing strategy for the hash table when load factor > 0.7.
 - 🔴 [dict.c, Dict] change the 'put' logic, it should handle occupancy properly.
+- 🟠 [dict.c, Dict] create new errno type for error handling.
 - 🟠 [dict.c, Dict] create another Dict type where it stores only void* ptr in items.

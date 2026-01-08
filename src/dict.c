@@ -6,20 +6,23 @@
 #include "hash.h"
 
 /* Checks if a certain cell is NULL or not. */
-static int is_avaible(Dict *dict, long cell){
-    assert(dict->capacity > (size_t)cell); // Buffer overflow check.
+static int is_avaible(Dict *dict, unsigned long cell){
+    assert(dict);
+    assert(dict->capacity > cell); // Buffer overflow check.
 
     return dict->entries[cell] == NULL ? 1: 0;
 }
 
 /* Return 1 if 'dict' is empty, 0 otherwise. */
 static int is_empty(Dict *dict){
+    assert(dict);
     return dict->size == 0;
 }
 
 /* Free internal memory of 'entry' and 'entry' it self.
  * 'entry' can be NULL. */
 static void free_entry(DictEntry *entry){
+    assert(entry);
     if(!entry) return;
 
     if(entry->value->type==DICT_STRING)
@@ -30,10 +33,12 @@ static void free_entry(DictEntry *entry){
     free(entry);
 }
 
-static int dict_put(Dict *dict, char *key, DictValue *item){ 
+static int dict_put(Dict *dict, char *key, DictValue *item){     
     assert(dict);
-    long k = dict->hfn(key, dict->capacity);
-    assert(dict->capacity > (size_t)k); // Buffer overflow check.
+    assert(key);    
+
+    unsigned long k = dict->hfn(key, dict->capacity);
+    assert(dict->capacity > k); // Buffer overflow check.
 
     if(!is_avaible(dict, k)){
         // COLLISION HANDLING.
@@ -55,7 +60,6 @@ static int dict_put(Dict *dict, char *key, DictValue *item){
  * - Pointer to a valid `Dict` on success, `NULL` on allocation failure
  * - Caller owns the returned dictionary. */
 Dict *dict_create(size_t capacity){
-    assert(capacity > 0);
     if(capacity <= 0) return NULL;
 
     Dict *d = malloc(sizeof(Dict));
@@ -77,7 +81,7 @@ Dict *dict_create(size_t capacity){
  * - Returns `1` on successful insertion, `0` on failure (collision, invalid input, allocation failure)
  * - The caller retains ownership of `key`. */
 int dict_put_int(Dict *dict, char *key, int val){
-    assert(dict);
+    if(dict == NULL || key == NULL) return 0;
 
     DictValue *dval = malloc(sizeof(*dval));
     dval->type = DICT_INT;
@@ -98,7 +102,7 @@ int dict_put_int(Dict *dict, char *key, int val){
  * - Returns `1` on successful insertion, `0` on failure (collision, invalid input, allocation failure)
  * - The caller retains ownership of `key`. */
 int dict_put_double(Dict *dict, char *key, double val){
-    assert(dict);
+    if(dict == NULL || key == NULL) return 0;
 
     DictValue *dval = malloc(sizeof(*dval));
     dval->type = DICT_DOUBLE;
@@ -119,7 +123,7 @@ int dict_put_double(Dict *dict, char *key, double val){
  * - Returns `1` on successful insertion, `0` on failure (collision, invalid input, allocation failure)
  * - The caller retains ownership of `key`. */
 int dict_put_string(Dict *dict, char *key, char *val){
-    assert(dict);
+    if(dict == NULL || key == NULL || val == NULL) return 0;
 
     char *newkey = strdup(key); // copy the key so caller retains ownership of the original key string
     char *newVal = strdup(val);
@@ -135,39 +139,40 @@ int dict_put_string(Dict *dict, char *key, char *val){
 }
 
 /* Retrieves the value associated with a key without removing it.
- * - `dict`, `key`, `out` must not be `NULL`
+ * - `dict`, `key`, `out` must be `non-NULL`
  * - If the key exists, `out` is written
  * - If the key does not exist, `out` is not modified
- * - Returns `1` if the key was found, `0` if the key was not found or on error*/
+ * - Returns `1` if the element was removed
+ * - Returns `0` if the key was not found or failure (collision, invalid input, allocation failure)*/
 int dict_get(Dict *dict, char *key, DictValue *out){
-    long k = dict->hfn(key, dict->capacity);
+    if(dict == NULL || key == NULL || out == NULL) return 0;
 
-    if (!dict->entries[k])
-        return 0;
-    
-    if (strcmp(dict->entries[k]->key, key) != 0)
-        return 0;
+    unsigned long k = dict->hfn(key, dict->capacity);
+    assert(dict->capacity > k);
+
+    if (!dict->entries[k]) return 0; // empty cell
+    if (strcmp(dict->entries[k]->key, key) != 0) return 0; // collision
 
     *out = *dict->entries[k]->value;
     return 1;
 }
 
 /* Retrieves and removes the value associated with a key.
- * - `dict`, `key`, `out` must not be `NULL`
+ * - `dict`, `key`, `out` must be `non-NULL`
  * - If the key exists:
  * - - The value is copied into `out`
  * - - The entry is removed from the dictionary
  * - If the key does not exist:
- * - - No state change occurs
- * - Returns `1` if the element was removed, `0` if the key was not found or on error*/
+ * - Returns `1` if the element was removed
+ * - Returns `0` if the key was not found or failure (collision, invalid input, allocation failure)*/
 int dict_take(Dict *dict, char *key, DictValue *out){
-    long k = dict->hfn(key, dict->capacity);
+    if(dict == NULL || key == NULL || out == NULL) return 0;
 
-    if (!dict->entries[k])
-        return 0;
+    unsigned long k = dict->hfn(key, dict->capacity);
+    assert(dict->capacity > k);
 
-    if (strcmp(dict->entries[k]->key, key) != 0)
-        return 0;
+    if (!dict->entries[k]) return 0; // empty cell
+    if (strcmp(dict->entries[k]->key, key) != 0) return 0; // collision
 
     DictEntry *entry = dict->entries[k];
     *out = *entry->value;
@@ -182,17 +187,16 @@ int dict_take(Dict *dict, char *key, DictValue *out){
 
 /* Removes all entries from the dictionary.
  * - Frees all internal entries
- * - The dictionary remains valid and reusable */
+ * - The dictionary remains valid and reusable 
+ * - If `dict` is NULL nothing happen */
 void dict_cleanup(Dict *dict){
-    assert(dict);
-    if(is_empty(dict)) 
-        return;
+    if(dict == NULL || is_empty(dict)) return;
 
     for(size_t i = 0; i < dict->capacity; i++){
         if (!dict->entries[i])
             continue;
 
-        free(dict->entries[i]);
+        free_entry(dict->entries[i]);
         dict->entries[i] = NULL;
     }
     
@@ -201,9 +205,11 @@ void dict_cleanup(Dict *dict){
 
 /* Destroys the dictionary and releases all associated resources.
  * - Frees all internal memory
- * - After this call, the dictionary pointer is invalid*/
+ * - After this call, the dictionary pointer is invalid
+ * - If `dict` is NULL nothing happen */
 void dict_destroy(Dict *dict){        
-    assert(dict);
+    if(dict == NULL) return;
+
     dict_cleanup(dict);
 
     free(dict->entries);

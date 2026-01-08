@@ -18,7 +18,6 @@ long string_to_ascii_long(const char *str){
         snprintf(temp, sizeof(temp), "%d", (unsigned char)str[i]);
         strcat(output, temp);
     }
-    printf("%s\n", output);
     
     char *endptr;
     long res = strtol(output, &endptr, 10);

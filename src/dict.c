@@ -5,26 +5,29 @@
 #include "dict.h"
 #include "hash.h"
 
+/// @brief Perform deep-copy of dest into src.
+/// @param dest 
+/// @param src 
+static void dict_value_copy(DictValue *dest, DictValue *src){
+    if(src->type == DICT_STRING){
+        strcpy(dest->s, src->s);
+    }
+    dest->type = src->type;
+}
+
 /* Checks if a certain cell is NULL or not. */
 static int is_avaible(Dict *dict, unsigned long cell){
-    assert(dict);
-    assert(dict->capacity > cell); // Buffer overflow check.
-
     return dict->entries[cell] == NULL ? 1: 0;
 }
 
 /* Return 1 if 'dict' is empty, 0 otherwise. */
 static int is_empty(Dict *dict){
-    assert(dict);
     return dict->size == 0;
 }
 
 /* Free internal memory of 'entry' and 'entry' it self.
  * 'entry' can be NULL. */
 static void free_entry(DictEntry *entry){
-    assert(entry);
-    if(!entry) return;
-
     if(entry->value->type==DICT_STRING)
         free(entry->value->s);
         
@@ -34,23 +37,26 @@ static void free_entry(DictEntry *entry){
 }
 
 static int dict_put(Dict *dict, char *key, DictValue *item){     
-    assert(dict);
-    assert(key);    
+    unsigned long cell = dict->hfn(key, dict->capacity);
+    assert(dict->capacity > cell); // Buffer overflow check.
 
-    unsigned long k = dict->hfn(key, dict->capacity);
-    assert(dict->capacity > k); // Buffer overflow check.
-
-    if(!is_avaible(dict, k)){
+    if(!is_avaible(dict, cell)){
         // COLLISION HANDLING.
         return 0;
     }
     
     DictEntry *entry = malloc(sizeof(*entry));
+    if (entry == NULL) return 0;
+
     entry->key = key;
     entry->value = item;
 
+    assert(dict->entries[cell] == NULL);
+    
     dict->size++;
-    dict->entries[k] = entry;
+    dict->entries[cell] = entry;
+
+    assert(dict->size <= dict->capacity);
 
     return 1;
 }
@@ -60,14 +66,16 @@ static int dict_put(Dict *dict, char *key, DictValue *item){
  * - Pointer to a valid `Dict` on success, `NULL` on allocation failure
  * - Caller owns the returned dictionary. */
 Dict *dict_create(size_t capacity){
-    if(capacity <= 0) return NULL;
+    if(capacity == 0) return NULL;
 
     Dict *d = malloc(sizeof(Dict));
+    if(d == NULL) return NULL;
 
     d->size = 0;
     d->capacity = capacity;
-    d->entries = calloc(capacity, sizeof(DictValue*));
     d->hfn = hash_get(DICTIONARY_HASH_FUNCTION);
+    d->entries = calloc(capacity, sizeof(DictValue*));
+    if (d->entries == NULL) return NULL;
 
     return d;
 }
@@ -84,6 +92,8 @@ int dict_put_int(Dict *dict, char *key, int val){
     if(dict == NULL || key == NULL) return 0;
 
     DictValue *dval = malloc(sizeof(*dval));
+    if(dval == NULL) return 0;
+
     dval->type = DICT_INT;
     dval->i = val;
 
@@ -105,6 +115,8 @@ int dict_put_double(Dict *dict, char *key, double val){
     if(dict == NULL || key == NULL) return 0;
 
     DictValue *dval = malloc(sizeof(*dval));
+    if(dval == NULL) return 0;
+
     dval->type = DICT_DOUBLE;
     dval->d = val;
 
@@ -129,6 +141,8 @@ int dict_put_string(Dict *dict, char *key, char *val){
     char *newVal = strdup(val);
 
     DictValue *dval = malloc(sizeof(*dval));
+    if(dval == NULL) return 0;
+
     dval->type = DICT_STRING;
     dval->s = newVal;
 
@@ -142,8 +156,8 @@ int dict_put_string(Dict *dict, char *key, char *val){
  * - `dict`, `key`, `out` must be `non-NULL`
  * - If the key exists, `out` is written
  * - If the key does not exist, `out` is not modified
- * - Returns `1` if the element was removed
- * - Returns `0` if the key was not found or failure (collision, invalid input, allocation failure)*/
+ * - Returns `1` if `out` is written
+ * - Returns `0` if the key was not found or failure (collision, invalid input)*/
 int dict_get(Dict *dict, char *key, DictValue *out){
     if(dict == NULL || key == NULL || out == NULL) return 0;
 
@@ -153,7 +167,8 @@ int dict_get(Dict *dict, char *key, DictValue *out){
     if (!dict->entries[k]) return 0; // empty cell
     if (strcmp(dict->entries[k]->key, key) != 0) return 0; // collision
 
-    *out = *dict->entries[k]->value;
+    dict_value_copy(out, dict->entries[k]->value);
+
     return 1;
 }
 
@@ -162,9 +177,9 @@ int dict_get(Dict *dict, char *key, DictValue *out){
  * - If the key exists:
  * - - The value is copied into `out`
  * - - The entry is removed from the dictionary
- * - If the key does not exist:
+ * - If the key does not exist, out is not modified
  * - Returns `1` if the element was removed
- * - Returns `0` if the key was not found or failure (collision, invalid input, allocation failure)*/
+ * - Returns `0` if the key was not found or failure (collision, invalid input)*/
 int dict_take(Dict *dict, char *key, DictValue *out){
     if(dict == NULL || key == NULL || out == NULL) return 0;
 
@@ -175,7 +190,7 @@ int dict_take(Dict *dict, char *key, DictValue *out){
     if (strcmp(dict->entries[k]->key, key) != 0) return 0; // collision
 
     DictEntry *entry = dict->entries[k];
-    *out = *entry->value;
+    dict_value_copy(out, dict->entries[k]->value);
 
     free_entry(entry);
 

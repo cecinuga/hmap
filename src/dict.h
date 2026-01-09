@@ -4,6 +4,26 @@
 #include <stddef.h>
 #include "hash.h"
 
+/* ========== ERROR HANDLING ========== */
+
+typedef enum {
+    DICT_OK = 0,              // Successo
+    DICT_ERR_NULL_ARG,        // Argomento NULL passato
+    DICT_ERR_NOMEM,           // Allocazione memoria fallita
+    DICT_ERR_COLLISION,       // Collisione hash
+    DICT_ERR_NOT_FOUND,       // Chiave non trovata
+    DICT_ERR_INVALID_CAPACITY // Capacity = 0 in dict_create
+} DictError;
+
+// Ottiene l'ultimo errore (thread-safe)
+DictError dict_last_error(void);
+
+// Resetta l'ultimo errore a DICT_OK
+void dict_clear_error(void);
+
+// Converte codice errore in stringa leggibile
+const char *dict_error_string(DictError err);
+
 /* ====== Dictionary constants. ====== */
 #define DICTIONARY_HASH_FUNCTION "djb2"
 
@@ -11,9 +31,9 @@
 
 /* Valid types Dict can store. */
 typedef enum {
-    DICT_INT, // int
-    DICT_DOUBLE, // double
-    DICT_STRING // char*
+    DICT_TYPE_INT, // int
+    DICT_TYPE_DOUBLE, // double
+    DICT_TYPE_STRING // char*
 } DictType;
 
 typedef struct {

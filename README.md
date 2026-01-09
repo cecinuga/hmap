@@ -194,9 +194,9 @@ Any implementation must adhere to this contract to be considered correct.
 
 
 Todo:
-- 🔴 [dict.c] insert assert conditions for all public API functions.
+- 🟠 [dict.c] @example summary not displayed in preview
+- 🔴 [alloc.c] create memory allocation suite of custom function handling error properly.
 - 🔴 [dict.c] implement a proper resizing strategy for the hash table when load factor > 0.7.
 - 🔴 [dict.c] change the 'put' logic, it should handle occupancy properly.
-- 🟠 [dict.c] create new errno types and handle function failure properly.
 - 🟠 [dict.c] create another Dict type where it stores only void* ptr in items.
 - 🟠 [dict.c] dict_get, handle string prop of DictValue memory allocation, now is uncomfortable for the user.

@@ -9,7 +9,7 @@ unsigned long hash_ascii(const char *key, const size_t size);
 unsigned long hash_djb2(const char *key, const size_t size);
 
 /* ====== Common hash function signs. ====== */
-typedef long (*HashFunction)(const char *key, const size_t size);
+typedef unsigned long (*HashFunction)(const char *key, const size_t size);
 
 /* ====== Utility ====== */
 typedef struct {

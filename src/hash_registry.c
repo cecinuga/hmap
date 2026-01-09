@@ -6,7 +6,10 @@ static HashEntry table[] = {
     {"djb2", hash_djb2},
 };
 
-/* It returns a hash function based on 'name'. */
+/* Returns hash function based on 'name'. 
+ * Avaible hash functions are: 
+ * - ascii (translate `key` param into ascii number representation. )
+ * - djb2 */
 HashFunction hash_get(const char *name){
     for(size_t i = 0; i < sizeof(table)/sizeof(table[0]); i++){
         if(strcmp(name, table[i].name) == 0)

@@ -5,7 +5,7 @@
 #include "dict.h"
 #include "hash.h"
 
-/// @brief Perform deep-copy of dest into src.
+/// @brief Perform deep-copy of `dest` into `src`.
 /// @param dest 
 /// @param src 
 static void dict_value_copy(DictValue *dest, DictValue *src){

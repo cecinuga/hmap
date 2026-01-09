@@ -8,26 +8,45 @@
 /// @brief Perform deep-copy of `dest` into `src`.
 /// @param dest 
 /// @param src 
-static void dict_value_copy(DictValue *dest, DictValue *src){
-    if(src->type == DICT_STRING){
-        strcpy(dest->s, src->s);
-    }
+static void dict_value_copy(DictValue *dest, const DictValue *src){
+    assert(dest && src);
+
     dest->type = src->type;
+
+    switch (src->type) {
+    case DICT_INT:
+        dest->i = src->i;
+        break;
+
+    case DICT_DOUBLE:
+        dest->d = src->d;
+        break;
+
+    case DICT_STRING:
+        dest->s = malloc(strlen(src->s) + 1);
+        assert(dest->s);
+        strcpy(dest->s, src->s);
+        break;
+    }
 }
 
 /* Checks if a certain cell is NULL or not. */
 static int is_avaible(Dict *dict, unsigned long cell){
+    assert(dict != NULL);
+    assert(cell < dict->capacity);
     return dict->entries[cell] == NULL ? 1: 0;
 }
 
 /* Return 1 if 'dict' is empty, 0 otherwise. */
 static int is_empty(Dict *dict){
+    assert(dict != NULL);
     return dict->size == 0;
 }
 
 /* Free internal memory of 'entry' and 'entry' it self.
  * 'entry' can be NULL. */
 static void free_entry(DictEntry *entry){
+    assert(entry != NULL);
     if(entry->value->type==DICT_STRING)
         free(entry->value->s);
         
@@ -36,7 +55,10 @@ static void free_entry(DictEntry *entry){
     free(entry);
 }
 
-static int dict_put(Dict *dict, char *key, DictValue *item){     
+static int dict_put(Dict *dict, char *key, DictValue *item){   
+    assert(dict != NULL);
+    assert(dict->hfn != NULL);  
+
     unsigned long cell = dict->hfn(key, dict->capacity);
     assert(dict->capacity > cell); // Buffer overflow check.
 
@@ -47,9 +69,22 @@ static int dict_put(Dict *dict, char *key, DictValue *item){
     
     DictEntry *entry = malloc(sizeof(*entry));
     if (entry == NULL) return 0;
+    
+    entry->key = malloc(strlen(key)+1);
+    if(entry->key == NULL) {
+        free(entry);
+        return 0;
+    }
 
-    entry->key = key;
-    entry->value = item;
+    entry->value = calloc(1, sizeof(*entry->value));
+    if(entry->value == NULL) {
+        free(entry->key);
+        free(entry);
+        return 0;
+    }
+
+    strcpy(entry->key, key);
+    dict_value_copy(entry->value, item);
 
     assert(dict->entries[cell] == NULL);
     
@@ -74,8 +109,11 @@ Dict *dict_create(size_t capacity){
     d->size = 0;
     d->capacity = capacity;
     d->hfn = hash_get(DICTIONARY_HASH_FUNCTION);
-    d->entries = calloc(capacity, sizeof(DictValue*));
-    if (d->entries == NULL) return NULL;
+    d->entries = calloc(capacity, sizeof(DictEntry*));
+    if (d->entries == NULL) {
+        dict_destroy(d);
+        return NULL;
+    }
 
     return d;
 }
@@ -98,7 +136,7 @@ int dict_put_int(Dict *dict, char *key, int val){
     dval->i = val;
 
     int res = dict_put(dict, key, dval);
-    if(!res) free(dval);
+    free(dval);
 
     return res;
 }
@@ -121,7 +159,7 @@ int dict_put_double(Dict *dict, char *key, double val){
     dval->d = val;
 
     int res = dict_put(dict, key, dval);
-    if(!res) free(dval);
+    free(dval);
 
     return res;
 }
@@ -137,17 +175,19 @@ int dict_put_double(Dict *dict, char *key, double val){
 int dict_put_string(Dict *dict, char *key, char *val){
     if(dict == NULL || key == NULL || val == NULL) return 0;
 
-    char *newkey = strdup(key); // copy the key so caller retains ownership of the original key string
-    char *newVal = strdup(val);
-
     DictValue *dval = malloc(sizeof(*dval));
     if(dval == NULL) return 0;
 
     dval->type = DICT_STRING;
-    dval->s = newVal;
+    dval->s = strdup(val);
+    if(dval->s == NULL) {
+        free(dval);  
+        return 0;
+    }
 
-    int res = dict_put(dict, newkey, dval);
-    if(!res) free(dval);
+    int res = dict_put(dict, key, dval);
+    free(dval->s);
+    free(dval);   
 
     return res;
 }

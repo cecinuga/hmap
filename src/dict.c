@@ -9,7 +9,7 @@
 /* ========== PRIVATE HELPERS ========== */
 
 /* Convert a key into cell position using the dict hash function. */
-static unsigned long *to_cell(Dict *dict, char *key){
+static unsigned long to_cell(Dict *dict, char *key){
     assert(dict);
     assert(key);
 
@@ -81,6 +81,21 @@ static void free_entry(DictEntry *entry){
     free(entry);
 }
 
+static DictValue *get_dict_value(Dict *dict, char *key){
+    assert(dict);
+    assert(key);
+    dict_clear_error();
+
+    unsigned long cell = to_cell(dict, key);
+
+    if (is_avaible(dict, cell))
+        SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, NULL);
+    if (strcmp(dict->entries[cell]->key, key) != 0) 
+        SET_ERROR_AND_RETURN(DICT_ERR_COLLISION, NULL);
+
+    return dict->entries[cell]->value;
+}
+
 /**
  * Creates a new dictionary with a fixed capacity.
  * 
@@ -133,7 +148,7 @@ int dict_upd_int(Dict *dict, char *key, int val){
     if(dict == NULL || key == NULL) 
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    DictValue *old = dict_get(dict, key);
+    DictValue *old = get_dict_value(dict, key);
 
     if(old->type != DICT_TYPE_INT)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
@@ -158,7 +173,7 @@ int dict_upd_double(Dict *dict, char *key, double val){
     if(dict == NULL || key == NULL) 
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    DictValue *old = dict_get(dict, key);
+    DictValue *old = get_dict_value(dict, key);
 
     if(old->type != DICT_TYPE_DOUBLE)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
@@ -184,7 +199,7 @@ int dict_upd_string(Dict *dict, char *key, char *val){
     if(dict == NULL || key == NULL) 
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    DictValue *old = dict_get(dict, key);
+    DictValue *old = get_dict_value(dict, key);
 
     if(old->type != DICT_TYPE_STRING)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
@@ -212,7 +227,7 @@ static int dict_put(Dict *dict, char *key, DictValue *item){
     assert(key != NULL);
     assert(item != NULL);
     
-    unsigned long cell = to_cell(dict->hfn, key);
+    unsigned long cell = to_cell(dict, key);
 
     if(!is_avaible(dict, cell)){
         // COLLISION HANDLING.
@@ -357,21 +372,6 @@ int dict_put_string(Dict *dict, char *key, char *val){
 
 /* ========== START API GET/TAKE IMPLEMENTATIONS ========== */
 
-static DictValue *dict_get(Dict *dict, char *key){
-    assert(dict);
-    assert(key);
-    dict_clear_error();
-
-    unsigned long cell = to_cell(dict, key);
-
-    if (is_avaible(dict, cell))
-        SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, NULL);
-    if (strcmp(dict->entries[cell]->key, key) != 0) 
-        SET_ERROR_AND_RETURN(DICT_ERR_COLLISION, NULL);
-
-    return dict->entries[cell];
-}
-
 /**
  * Retrieves a value from the dictionary without removing it.
  * 
@@ -396,7 +396,7 @@ int dict_get(Dict *dict, char *key, DictValue *out){
     if(dict == NULL || key == NULL)
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
         
-    DictValue *val = dict_get(dict, key);
+    DictValue *val = get_dict_value(dict, key);
     if(val == NULL) return 0;
     
     dict_value_copy(out, val);
@@ -433,7 +433,7 @@ int dict_take(Dict *dict, char *key, DictValue *out){
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
     unsigned long cell = to_cell(dict, key);
-    DictValue *val = dict_get(dict, key);
+    DictValue *val = get_dict_value(dict, key);
 
     dict_value_copy(out, val);
 
@@ -501,5 +501,3 @@ void dict_destroy(Dict *dict){
     free(dict->entries);
     free(dict);
 }
-
-

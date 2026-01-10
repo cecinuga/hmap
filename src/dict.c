@@ -8,6 +8,17 @@
 
 /* ========== PRIVATE HELPERS ========== */
 
+/* Convert a key into cell position using the dict hash function. */
+static unsigned long *to_cell(Dict *dict, char *key){
+    assert(dict);
+    assert(key);
+
+    unsigned long cell = dict->hfn(key, dict->capacity);
+    assert(dict->capacity > cell);
+
+    return cell;
+}
+
 /// @brief Perform deep-copy of `src` into `dest`.
 /// @param dest Destination value (must not be NULL)
 /// @param src Source value (must not be NULL)
@@ -70,58 +81,6 @@ static void free_entry(DictEntry *entry){
     free(entry);
 }
 
-/// @brief Internal function to insert a key-value pair into the dictionary.
-/// @param dict Dictionary pointer (must not be NULL)
-/// @param key Key string (must not be NULL)
-/// @param item Value to insert (must not be NULL)
-/// @return 1 on success, 0 on failure
-/// @note Asserts if any parameter is NULL
-/// @note Clears error state at start
-static int dict_put(Dict *dict, char *key, DictValue *item){   
-    dict_clear_error();
-    assert(dict != NULL);
-    assert(dict->hfn != NULL);  
-    assert(key != NULL);
-    assert(item != NULL);
-    
-    unsigned long cell = dict->hfn(key, dict->capacity);
-    assert(dict->capacity > cell); // Buffer overflow check.
-
-    if(!is_avaible(dict, cell)){
-        // COLLISION HANDLING.
-        SET_ERROR_AND_RETURN(DICT_ERR_COLLISION, 0);
-    }
-    
-    DictEntry *entry = malloc(sizeof(*entry));
-    if (entry == NULL) SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
-    
-    entry->key = malloc(strlen(key)+1);
-    if(entry->key == NULL) {
-        free_entry(entry);
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
-    }
-
-    entry->value = calloc(1, sizeof(*entry->value));
-    if(entry->value == NULL) {
-        free_entry(entry);
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
-    }
-
-    strcpy(entry->key, key);
-    dict_value_copy(entry->value, item);
-
-    assert(dict->entries[cell] == NULL);
-    
-    dict->size++;
-    dict->entries[cell] = entry;
-
-    assert(dict->size <= dict->capacity);
-
-    return 1;
-}
-
-/* ========== PUBLIC API IMPLEMENTATION ========== */
-
 /**
  * Creates a new dictionary with a fixed capacity.
  * 
@@ -155,6 +114,137 @@ Dict *dict_create(size_t capacity){
     }
 
     return d;
+}
+
+/* ========== START API UPDATE IMPLEMENTATIONS ========== */
+
+/**
+ * Update existing entry with new value.
+ * 
+ * @param dict Dictionary to update into (must not be NULL)
+ * @param key Key string (must not be NULL, null-terminated)
+ * @param val Integer value to update
+ * @return 1 on success, 0 on failure
+ * 
+ * @note Type between old value and new value must be the same.
+ */
+int dict_upd_int(Dict *dict, char *key, int val){
+    dict_clear_error();
+    if(dict == NULL || key == NULL) 
+        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
+
+    DictValue *old = dict_get(dict, key);
+
+    if(old->type != DICT_TYPE_INT)
+        SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
+
+    old->i = val;
+
+    return 1;
+}
+
+/**
+ * Update existing entry with new value.
+ * 
+ * @param dict Dictionary to update into (must not be NULL)
+ * @param key Key string (must not be NULL, null-terminated)
+ * @param val Double value to update
+ * @return 1 on success, 0 on failure
+ * 
+ * @note Type between old value and new value must be the same.
+ */
+int dict_upd_double(Dict *dict, char *key, double val){
+    dict_clear_error();
+    if(dict == NULL || key == NULL) 
+        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
+
+    DictValue *old = dict_get(dict, key);
+
+    if(old->type != DICT_TYPE_DOUBLE)
+        SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
+
+    old->d = val;
+
+    return 1;
+}
+
+/**
+ * Update existing entry with new value.
+ * 
+ * @param dict Dictionary to update into (must not be NULL)
+ * @param key Key string (must not be NULL, null-terminated)
+ * @param val String value to update
+ * @return 1 on success, 0 on failure
+ * 
+ * @note Type between old value and new value must be the same.
+ * @note The val is copied internally; caller retains ownership of original
+ */
+int dict_upd_string(Dict *dict, char *key, char *val){
+    dict_clear_error();
+    if(dict == NULL || key == NULL) 
+        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
+
+    DictValue *old = dict_get(dict, key);
+
+    if(old->type != DICT_TYPE_STRING)
+        SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
+
+    strcpy(old->s, val);
+
+    return 1;
+}
+
+/* ========== END API UPDATE IMPLEMENTATIONS ========== */
+
+/* ========== START API INSERT IMPLEMENTATIONS ========== */
+
+/// @brief Internal function to insert a key-value pair into the dictionary.
+/// @param dict Dictionary pointer (must not be NULL)
+/// @param key Key string (must not be NULL)
+/// @param item Value to insert (must not be NULL)
+/// @return 1 on success, 0 on failure
+/// @note Asserts if any parameter is NULL
+/// @note Clears error state at start
+static int dict_put(Dict *dict, char *key, DictValue *item){   
+    dict_clear_error();
+    assert(dict != NULL);
+    assert(dict->hfn != NULL);  
+    assert(key != NULL);
+    assert(item != NULL);
+    
+    unsigned long cell = to_cell(dict->hfn, key);
+
+    if(!is_avaible(dict, cell)){
+        // COLLISION HANDLING.
+        SET_ERROR_AND_RETURN(DICT_ERR_COLLISION, 0);
+    }
+    
+    DictEntry *entry = malloc(sizeof(*entry));
+    if (entry == NULL) SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
+    
+    entry->key = malloc(strlen(key)+1);
+    if(entry->key == NULL) {
+        free_entry(entry);
+        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
+    }
+
+    entry->value = calloc(1, sizeof(*entry->value));
+    if(entry->value == NULL) {
+        free_entry(entry);
+        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
+    }
+
+    strcpy(entry->key, key);
+    dict_value_copy(entry->value, item);
+
+    assert(dict->entries[cell] == NULL);
+    
+    dict->size++;
+    dict->entries[cell] = entry;
+
+    assert(dict->size <= dict->capacity);
+
+    return 1;
 }
 
 /**
@@ -263,6 +353,25 @@ int dict_put_string(Dict *dict, char *key, char *val){
     return res;
 }
 
+/* ========== END API INSERT IMPLEMENTATIONS ========== */
+
+/* ========== START API GET/TAKE IMPLEMENTATIONS ========== */
+
+static DictValue *dict_get(Dict *dict, char *key){
+    assert(dict);
+    assert(key);
+    dict_clear_error();
+
+    unsigned long cell = to_cell(dict, key);
+
+    if (is_avaible(dict, cell))
+        SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, NULL);
+    if (strcmp(dict->entries[cell]->key, key) != 0) 
+        SET_ERROR_AND_RETURN(DICT_ERR_COLLISION, NULL);
+
+    return dict->entries[cell];
+}
+
 /**
  * Retrieves a value from the dictionary without removing it.
  * 
@@ -284,19 +393,13 @@ int dict_put_string(Dict *dict, char *key, char *val){
  *   }
  */
 int dict_get(Dict *dict, char *key, DictValue *out){
-    dict_clear_error();
-    if(dict == NULL || key == NULL || out == NULL)
+    if(dict == NULL || key == NULL)
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
-
-    unsigned long cell = dict->hfn(key, dict->capacity);
-    assert(dict->capacity > cell);
-
-    if (is_avaible(dict, cell))
-        SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, 0); // not found
-    if (strcmp(dict->entries[cell]->key, key) != 0) 
-        SET_ERROR_AND_RETURN(DICT_ERR_COLLISION, 0); // collision
-
-    dict_value_copy(out, dict->entries[cell]->value);
+        
+    DictValue *val = dict_get(dict, key);
+    if(val == NULL) return 0;
+    
+    dict_value_copy(out, val);
 
     return 1;
 }
@@ -329,23 +432,19 @@ int dict_take(Dict *dict, char *key, DictValue *out){
     if(dict == NULL || key == NULL || out == NULL)
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    unsigned long cell = dict->hfn(key, dict->capacity);
-    assert(dict->capacity > cell);
+    unsigned long cell = to_cell(dict, key);
+    DictValue *val = dict_get(dict, key);
 
-    if (is_avaible(dict, cell))
-        SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, 0); // not found
-    if (strcmp(dict->entries[cell]->key, key) != 0)
-        SET_ERROR_AND_RETURN(DICT_ERR_COLLISION, 0); // collision
-
-    dict_value_copy(out, dict->entries[cell]->value);
+    dict_value_copy(out, val);
 
     free_entry(dict->entries[cell]);
-
     dict->entries[cell] = NULL;
     dict->size--;
 
     return 1;
 }
+
+/* ========== END API GET/TAKE IMPLEMENTATIONS ========== */
 
 /**
  * Removes all entries from the dictionary.

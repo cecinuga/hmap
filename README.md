@@ -194,10 +194,10 @@ Any implementation must adhere to this contract to be considered correct.
 
 
 Todo:
-- 🟠 changing how we put the type throw dict_put function passing type directly in dict_put
-- 🟢 [dict.c] @example summary not displayed in preview
-- 🔴 [alloc.c] create memory allocation suite of custom function handling error properly.
+- 🔴 [dict.c] implement dict_upd_* which given a key and a value update the entry with new value
 - 🔴 [dict.c] implement a proper resizing strategy for the hash table when load factor > 0.7.
 - 🔴 [dict.c] change the 'put' logic, it should handle occupancy properly.
+- 🟠 changing how we put the type throw dict_put function passing type directly in dict_put
 - 🟠 [dict.c] create another Dict type where it stores only void* ptr in items.
 - 🟠 [dict.c] dict_get, handle string prop of DictValue memory allocation, now is uncomfortable for the user.
+- 🟢 [dict.c] @example summary not displayed in preview

@@ -2,47 +2,9 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
-#include "dict.h"
 #include "hash.h"
-
-/* ========== ERROR HANDLING IMPLEMENTATION ========== */
-
-// Thread-local storage per l'ultimo errore
-static _Thread_local DictError g_last_error = DICT_OK;
-
-DictError dict_last_error(void) {
-    return g_last_error;
-}
-
-void dict_clear_error(void) {
-    g_last_error = DICT_OK;
-}
-
-// Macro helper per settare errore e ritornare
-#define SET_ERROR_AND_RETURN(err, retval) { \
-    g_last_error = (err); \
-    return (retval); \
-}
-
-const char *dict_error_string(DictError err) {
-    switch (err) {
-        case DICT_OK:
-            return "Success";
-        case DICT_ERR_NULL_ARG:
-            return "NULL argument provided";
-        case DICT_ERR_NOMEM:
-            return "Memory allocation failed";
-        case DICT_ERR_COLLISION:
-            return "Hash collision occurred";
-        case DICT_ERR_NOT_FOUND:
-            return "Key not found";
-        case DICT_ERR_INVALID_CAPACITY:
-            return "Invalid capacity (must be > 0)";
-        default:
-            return "Unknown error";
-    }
-}
-
+#include "dict.h"
+#include "dict_err.h"
 
 /* ========== PRIVATE HELPERS ========== */
 
@@ -99,11 +61,12 @@ static int is_empty(Dict *dict){
 /// @note Frees key, value, and string data if type is DICT_TYPE_STRING
 static void free_entry(DictEntry *entry){
     assert(entry != NULL);
-    if(entry->value->type==DICT_TYPE_STRING)
+    if(entry->value->type==DICT_TYPE_STRING && entry->value->s != NULL)
         free(entry->value->s);
-        
-    free(entry->value);
-    free(entry->key);
+    if(entry->value != NULL) 
+        free(entry->value);
+    if(entry->key != NULL) 
+        free(entry->key);
     free(entry);
 }
 
@@ -134,14 +97,13 @@ static int dict_put(Dict *dict, char *key, DictValue *item){
     
     entry->key = malloc(strlen(key)+1);
     if(entry->key == NULL) {
-        free(entry);
+        free_entry(entry);
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
     }
 
     entry->value = calloc(1, sizeof(*entry->value));
     if(entry->value == NULL) {
-        free(entry->key);
-        free(entry);
+        free_entry(entry);
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
     }
 
@@ -375,10 +337,9 @@ int dict_take(Dict *dict, char *key, DictValue *out){
     if (strcmp(dict->entries[cell]->key, key) != 0)
         SET_ERROR_AND_RETURN(DICT_ERR_COLLISION, 0); // collision
 
-    DictEntry *entry = dict->entries[cell];
     dict_value_copy(out, dict->entries[cell]->value);
 
-    free_entry(entry);
+    free_entry(dict->entries[cell]);
 
     dict->entries[cell] = NULL;
     dict->size--;
@@ -404,6 +365,7 @@ int dict_take(Dict *dict, char *key, DictValue *out){
  */
 void dict_cleanup(Dict *dict){
     if(dict == NULL) return;
+    if(is_empty(dict)) return;
 
     for(size_t i = 0; i < dict->capacity; i++){
         if (!dict->entries[i])

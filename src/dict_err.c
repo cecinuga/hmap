@@ -4,7 +4,8 @@
 /* ========== ERROR HANDLING IMPLEMENTATION ========== */
 
 // Thread-local storage per l'ultimo errore
-static _Thread_local DictError g_last_error = DICT_OK;
+
+_Thread_local DictError g_last_error = DICT_OK;
 
 DictError dict_last_error(void) {
     return g_last_error;

@@ -10,7 +10,7 @@ typedef enum {
     DICT_ERR_INVALID_CAPACITY // Capacity = 0 in dict_create
 } DictError;
 
-static _Thread_local DictError g_last_error;
+extern _Thread_local DictError g_last_error;
 
 // Ottiene l'ultimo errore (thread-safe)
 DictError dict_last_error(void);
@@ -22,4 +22,9 @@ void dict_clear_error(void);
 const char *dict_error_string(DictError err);
 
 // Macro helper per settare errore e ritornare
-#define SET_ERROR_AND_RETURN(err, retval) { g_last_error = (err); return (retval);}
+#define SET_ERROR_AND_RETURN(err, retval) \
+    do {                                 \
+        g_last_error = (err);            \
+        return (retval);                 \
+    } while (0)
+    

@@ -131,85 +131,6 @@ Dict *dict_create(size_t capacity){
     return d;
 }
 
-/* ========== START API UPDATE IMPLEMENTATIONS ========== */
-
-/**
- * Update existing entry with new value.
- * 
- * @param dict Dictionary to update into (must not be NULL)
- * @param key Key string (must not be NULL, null-terminated)
- * @param val Integer value to update
- * @return 1 on success, 0 on failure
- * 
- * @note Type between old value and new value must be the same.
- */
-int dict_upd_int(Dict *dict, char *key, int val){
-    dict_clear_error();
-    if(dict == NULL || key == NULL) 
-        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
-
-    DictValue *old = get_dict_value(dict, key);
-
-    if(old->type != DICT_TYPE_INT)
-        SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
-
-    old->i = val;
-
-    return 1;
-}
-
-/**
- * Update existing entry with new value.
- * 
- * @param dict Dictionary to update into (must not be NULL)
- * @param key Key string (must not be NULL, null-terminated)
- * @param val Double value to update
- * @return 1 on success, 0 on failure
- * 
- * @note Type between old value and new value must be the same.
- */
-int dict_upd_double(Dict *dict, char *key, double val){
-    dict_clear_error();
-    if(dict == NULL || key == NULL) 
-        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
-
-    DictValue *old = get_dict_value(dict, key);
-
-    if(old->type != DICT_TYPE_DOUBLE)
-        SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
-
-    old->d = val;
-
-    return 1;
-}
-
-/**
- * Update existing entry with new value.
- * 
- * @param dict Dictionary to update into (must not be NULL)
- * @param key Key string (must not be NULL, null-terminated)
- * @param val String value to update
- * @return 1 on success, 0 on failure
- * 
- * @note Type between old value and new value must be the same.
- * @note The val is copied internally; caller retains ownership of original
- */
-int dict_upd_string(Dict *dict, char *key, char *val){
-    dict_clear_error();
-    if(dict == NULL || key == NULL) 
-        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
-
-    DictValue *old = get_dict_value(dict, key);
-
-    if(old->type != DICT_TYPE_STRING)
-        SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
-
-    strcpy(old->s, val);
-
-    return 1;
-}
-
-/* ========== END API UPDATE IMPLEMENTATIONS ========== */
 
 /* ========== START API INSERT IMPLEMENTATIONS ========== */
 
@@ -369,6 +290,87 @@ int dict_put_string(Dict *dict, char *key, char *val){
 }
 
 /* ========== END API INSERT IMPLEMENTATIONS ========== */
+
+
+/* ========== START API UPDATE IMPLEMENTATIONS ========== */
+
+/**
+ * Update existing entry with new value.
+ * 
+ * @param dict Dictionary to update into (must not be NULL)
+ * @param key Key string (must not be NULL, null-terminated)
+ * @param val Integer value to update
+ * @return 1 on success, 0 on failure
+ * 
+ * @note Type between old value and new value must be the same.
+ */
+int dict_upd_int(Dict *dict, char *key, int val){
+    dict_clear_error();
+    if(dict == NULL || key == NULL) 
+        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
+
+    DictValue *old = get_dict_value(dict, key);
+
+    if(old->type != DICT_TYPE_INT)
+        SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
+
+    old->i = val;
+
+    return 1;
+}
+
+/**
+ * Update existing entry with new value.
+ * 
+ * @param dict Dictionary to update into (must not be NULL)
+ * @param key Key string (must not be NULL, null-terminated)
+ * @param val Double value to update
+ * @return 1 on success, 0 on failure
+ * 
+ * @note Type between old value and new value must be the same.
+ */
+int dict_upd_double(Dict *dict, char *key, double val){
+    dict_clear_error();
+    if(dict == NULL || key == NULL) 
+        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
+
+    DictValue *old = get_dict_value(dict, key);
+
+    if(old->type != DICT_TYPE_DOUBLE)
+        SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
+
+    old->d = val;
+
+    return 1;
+}
+
+/**
+ * Update existing entry with new value.
+ * 
+ * @param dict Dictionary to update into (must not be NULL)
+ * @param key Key string (must not be NULL, null-terminated)
+ * @param val String value to update
+ * @return 1 on success, 0 on failure
+ * 
+ * @note Type between old value and new value must be the same.
+ * @note The val is copied internally; caller retains ownership of original
+ */
+int dict_upd_string(Dict *dict, char *key, char *val){
+    dict_clear_error();
+    if(dict == NULL || key == NULL) 
+        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
+
+    DictValue *old = get_dict_value(dict, key);
+
+    if(old->type != DICT_TYPE_STRING)
+        SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
+
+    strcpy(old->s, val);
+
+    return 1;
+}
+
+/* ========== END API UPDATE IMPLEMENTATIONS ========== */
 
 /* ========== START API GET/TAKE IMPLEMENTATIONS ========== */
 

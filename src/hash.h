@@ -1,23 +1,13 @@
 #ifndef HASH_FUNCTIONS_H
 #define HASH_FUNCTIONS_H
 #include <stddef.h>
+#include <stdint.h>
 
-#define HASH_MAGIC_N 5381
+#define DICT_HASH
 
 /* ====== Avaible hash functions ====== */
-unsigned long hash_ascii(const char *key, const size_t size);
-unsigned long hash_djb2(const char *key, const size_t size);
-
-/* ====== Common hash function signs. ====== */
-typedef unsigned long (*HashFunction)(const char *key, const size_t size);
-
-/* ====== Utility ====== */
-typedef struct {
-    const char *name;
-    HashFunction fn;
-} HashEntry;
-
-/* It returns a hash function based on 'name'. */
-HashFunction hash_get(const char *name);
+uint64_t hash_fnv1a(const char *key);
+uint64_t hash_djb2(const char *key);
+uint32_t double_hash(char *key, uint32_t i, uint32_t size);
 
 #endif

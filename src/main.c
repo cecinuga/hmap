@@ -6,18 +6,33 @@
 int main(void){
   Dict *dict = dict_create(100);
 
-  int r = dict_put_string(dict, "b", "ciao");
-  int r2 = dict_upd_string(dict, "b", "come");
+  int r = dict_put_string(dict, "a", "ciao");
+  if(!r){
+    int err = dict_last_error();
+    perror(dict_error_string(err));
+    return 1;
+  }
 
-  DictValue *str = malloc(sizeof(*str));
+  r = dict_upd_string(dict, "a", "ciaoooo");
+  if(!r){
+    int err = dict_last_error();
+    perror(dict_error_string(err));
+    return 1;
+  }
 
-  dict_get(dict, "b", str);
+  DictValue *val = malloc(sizeof(DictValue));
+  r = dict_get(dict, "a", val);
+  if(!r){
+    int err = dict_last_error();
+    perror(dict_error_string(err));
+    return 1;
+  }
 
-  printf("%s\n", str->s);
+  printf("%s \n", val->s);
 
+  free(val->s);
+  free(val);
   dict_destroy(dict);
 
-  free(str->s);
-  free(str);
   return 0;
 }

@@ -9,15 +9,6 @@
 /* ========== PRIVATE HELPERS ========== */
 
 /* Convert a key into cell position using the dict hash function. */
-static unsigned long to_cell(Dict *dict, char *key){
-    assert(dict);
-    assert(key);
-
-    unsigned long cell = dict->hfn(key, dict->capacity);
-    assert(dict->capacity > cell);
-
-    return cell;
-}
 
 /// @brief Perform deep-copy of `src` into `dest`.
 /// @param dest Destination value (must not be NULL)
@@ -51,7 +42,7 @@ static void dict_value_copy(DictValue *dest, const DictValue *src){
 /// @param cell Cell index to check (must be < dict->capacity)
 /// @return 1 if cell is NULL (available), 0 otherwise
 /// @note Asserts if dict is NULL or cell is out of bounds
-static int is_avaible(Dict *dict, unsigned long cell){
+static int is_avaible(Dict *dict, uint32_t cell){
     assert(dict != NULL);
     assert(cell < dict->capacity);
     return dict->entries[cell] == NULL ? 1: 0;
@@ -81,17 +72,46 @@ static void free_entry(DictEntry *entry){
     free(entry);
 }
 
+uint32_t get_empty_cell(Dict *dict, char *key){
+    uint32_t i = 0;
+    uint32_t cell = double_hash(key, i, dict->capacity);
+        
+    while(!is_avaible(dict, cell)){
+        if(strcmp(dict->entries[cell]->key, key) == 0)
+            SET_ERROR_AND_RETURN(DICT_ERR_ALR_INSERTED, INVALID_CELL);
+        if(i == dict->capacity)
+            SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, INVALID_CELL);
+
+        i++;
+        cell = double_hash(key, i, dict->capacity);
+    }
+
+    return cell;
+}
+
+uint32_t get_key_cell(Dict *dict, char *key){
+    uint32_t cell, i = 0;
+    do {
+        cell = double_hash(key, i, dict->capacity);
+        i++;
+        if(i == dict->capacity)
+            SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, INVALID_CELL);
+    } while(!is_avaible(dict, cell) && strcmp(dict->entries[cell]->key, key) != 0);
+
+    if (is_avaible(dict, cell))
+        SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, INVALID_CELL);
+
+    return cell;
+}
+
 static DictValue *get_dict_value(Dict *dict, char *key){
     assert(dict);
     assert(key);
     dict_clear_error();
 
-    unsigned long cell = to_cell(dict, key);
-
-    if (is_avaible(dict, cell))
-        SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, NULL);
-    if (strcmp(dict->entries[cell]->key, key) != 0) 
-        SET_ERROR_AND_RETURN(DICT_ERR_COLLISION, NULL);
+    uint32_t cell = get_key_cell(dict, key);
+    if(cell == INVALID_CELL)
+        return NULL;
 
     return dict->entries[cell]->value;
 }
@@ -110,7 +130,7 @@ static DictValue *get_dict_value(Dict *dict, char *key){
  *       fprintf(stderr, "Error: %s\n", dict_error_string(dict_last_error()));
  *   }
  */
-Dict *dict_create(size_t capacity){
+Dict *dict_create(uint32_t capacity){
     dict_clear_error();
     if(capacity == 0) 
         SET_ERROR_AND_RETURN(DICT_ERR_INVALID_CAPACITY, NULL);
@@ -121,7 +141,6 @@ Dict *dict_create(size_t capacity){
 
     d->size = 0;
     d->capacity = capacity;
-    d->hfn = hash_get(DICTIONARY_HASH_FUNCTION);
     d->entries = calloc(capacity, sizeof(DictEntry*));
     if (d->entries == NULL) {
         dict_destroy(d);
@@ -144,16 +163,12 @@ Dict *dict_create(size_t capacity){
 static int dict_put(Dict *dict, char *key, DictValue *item){   
     dict_clear_error();
     assert(dict != NULL);
-    assert(dict->hfn != NULL);  
     assert(key != NULL);
     assert(item != NULL);
     
-    unsigned long cell = to_cell(dict, key);
-
-    if(!is_avaible(dict, cell)){
-        // COLLISION HANDLING.
-        SET_ERROR_AND_RETURN(DICT_ERR_COLLISION, 0);
-    }
+    uint32_t cell = get_empty_cell(dict, key);
+    if(cell == INVALID_CELL)
+        return 0;
     
     DictEntry *entry = malloc(sizeof(*entry));
     if (entry == NULL) SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
@@ -310,6 +325,7 @@ int dict_upd_int(Dict *dict, char *key, int val){
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
     DictValue *old = get_dict_value(dict, key);
+    if(old == NULL) return 0;
 
     if(old->type != DICT_TYPE_INT)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
@@ -335,6 +351,7 @@ int dict_upd_double(Dict *dict, char *key, double val){
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
     DictValue *old = get_dict_value(dict, key);
+    if(old == NULL) return 0;
 
     if(old->type != DICT_TYPE_DOUBLE)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
@@ -361,6 +378,7 @@ int dict_upd_string(Dict *dict, char *key, char *val){
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
     DictValue *old = get_dict_value(dict, key);
+    if(old == NULL) return 0;
 
     if(old->type != DICT_TYPE_STRING)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
@@ -434,8 +452,11 @@ int dict_take(Dict *dict, char *key, DictValue *out){
     if(dict == NULL || key == NULL || out == NULL)
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    unsigned long cell = to_cell(dict, key);
-    DictValue *val = get_dict_value(dict, key);
+    uint32_t cell = get_empty_cell(dict, key); 
+    if(cell == INVALID_CELL)
+        return 0;
+        
+    DictValue *val = get_dict_value(dict, key); // CALCULATED 2 TIMES THE HASH FUNCTION, INPROVE
 
     dict_value_copy(out, val);
 
@@ -468,7 +489,7 @@ void dict_cleanup(Dict *dict){
     if(dict == NULL) return;
     if(is_empty(dict)) return;
 
-    for(size_t i = 0; i < dict->capacity; i++){
+    for(uint32_t i = 0; i < dict->capacity; i++){
         if (!dict->entries[i])
             continue;
 

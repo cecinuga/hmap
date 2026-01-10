@@ -23,8 +23,8 @@ const char *dict_error_string(DictError err) {
             return "NULL argument provided";
         case DICT_ERR_NOMEM:
             return "Memory allocation failed";
-        case DICT_ERR_COLLISION:
-            return "Hash collision occurred";
+        case DICT_ERR_ALR_INSERTED:
+            return "Key already inserted";
         case DICT_ERR_NOT_FOUND:
             return "Key not found";
         case DICT_ERR_INVALID_CAPACITY:

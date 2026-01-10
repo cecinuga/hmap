@@ -5,8 +5,9 @@ typedef enum {
     DICT_ERR_NULL_ARG,        // NULL argument
     DICT_ERR_MIS_TYPE,        // try to update dict value mismatching type
     DICT_ERR_NOMEM,           // Memory allocation failed
-    DICT_ERR_COLLISION,       // Hash collision
+    DICT_ERR_ALR_INSERTED,    // Key already inserted
     DICT_ERR_NOT_FOUND,       // Key not found
+    DICT_ERR_DICT_FULL,       // Dict is full
     DICT_ERR_INVALID_CAPACITY // Capacity = 0 in dict_create
 } DictError;
 

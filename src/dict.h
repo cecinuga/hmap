@@ -1,11 +1,13 @@
 #ifndef DICT_H
 #define DICT_H
-
 #include <stddef.h>
+#include <stdint.h>
 #include "hash.h"
 
 /* ====== Dictionary constants. ====== */
-#define DICTIONARY_HASH_FUNCTION "djb2"
+#define INVALID_CELL UINT32_MAX
+#define DICT_HASH_PRIMARY "djb2"
+#define DICT_HASH_SECONDARY "fnv1a"
 
 /* ====== Dictionary struct ====== */
 
@@ -33,16 +35,15 @@ typedef struct {
 /* A simple dictionary.
  * Common operations like insert, remove and search are implemented in O(1). */
 typedef struct {
-    size_t size; // How many items are actualy storing.
-    size_t capacity; // How many items can store.
-    HashFunction hfn; // Hash function for calculating 'item' position based on 'key'.
+    uint32_t size; // How many items are actualy storing.
+    uint32_t capacity; // How many items can store.
 
     DictEntry **entries; // List of items.
 } Dict;
 
-/* ====== Dictionary utils ====== */
+/* ====== Dictionary API ====== */
 
-Dict *dict_create(size_t capacity);
+Dict *dict_create(uint32_t capacity);
 int dict_put_int(Dict *dict, char *key, int val);
 int dict_put_double(Dict *dict, char *key, double val);
 int dict_put_string(Dict *dict, char *key, char *val);

@@ -7,11 +7,11 @@
 /* ========== ERROR HANDLING ========== */
 
 typedef enum {
-    DICT_OK = 0,              // Successo
-    DICT_ERR_NULL_ARG,        // Argomento NULL passato
-    DICT_ERR_NOMEM,           // Allocazione memoria fallita
-    DICT_ERR_COLLISION,       // Collisione hash
-    DICT_ERR_NOT_FOUND,       // Chiave non trovata
+    DICT_OK = 0,              // Success
+    DICT_ERR_NULL_ARG,        // NULL argument
+    DICT_ERR_NOMEM,           // Memory allocation failed
+    DICT_ERR_COLLISION,       // Hash collision
+    DICT_ERR_NOT_FOUND,       // Key not found
     DICT_ERR_INVALID_CAPACITY // Capacity = 0 in dict_create
 } DictError;
 

@@ -177,10 +177,11 @@ static int dict_put(Dict *dict, char *key, DictValue *item){
 Dict *dict_create(size_t capacity){
     dict_clear_error();
     if(capacity == 0) 
-        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, NULL);
+        SET_ERROR_AND_RETURN(DICT_ERR_INVALID_CAPACITY, NULL);
 
     Dict *d = malloc(sizeof(Dict));
-    if(d == NULL) SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
+    if(d == NULL) 
+        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
 
     d->size = 0;
     d->capacity = capacity;

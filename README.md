@@ -1,202 +1,216 @@
-# Dict Library – API Contract
+# dict --- Dictionary Library in C
 
-## Overview
-`dict` is a simple C library implementing a key → value dictionary using hashing.
+`dict` is a lightweight and robust dictionary (hash table) library
+written in C. It provides key--value storage with support for multiple
+value types, collision resolution via **double hashing**, and explicit
+memory ownership semantics.
 
-The library is designed as a **public, fail-safe API**:
-- No intentional undefined behavior
-- No segmentation faults as a response to invalid input
-- All errors are reported explicitly via return values
+The library is designed to be: - predictable - memory-safe (Valgrind
+clean when used correctly) - suitable for low-level or embedded-style C
+projects
 
-This document defines the **official API contract** of the library.
+------------------------------------------------------------------------
 
----
+## ✨ Features
 
-## Design Philosophy
+-   Hash table with **open addressing + double hashing**
+-   Fixed-capacity dictionary (no implicit resizing)
+-   Supported value types:
+    -   `int`
+    -   `double`
+    -   `string` (deep-copied)
+-   Explicit and consistent **error handling**
+-   Clear **ownership rules**
+-   No global state (except error handling)
+-   Suitable for Valgrind / sanitizers
 
-### Public, Defensive API
-The library is intended to be used by external and potentially untrusted code.
+------------------------------------------------------------------------
 
-As a result:
-- Functions validate their inputs
-- Invalid inputs result in a clean failure
-- The library never returns incorrect data silently
+## 🧠 Design Overview
 
-### Dual-mode Development
-- In **debug builds**, internal invariants may be checked with `assert`
-- In **release builds**, errors are still handled gracefully
+### Data Model
 
-The observable behavior of the API does not change between builds.
+Each dictionary entry consists of: - a **string key** (internally
+copied) - a `DictValue` union tagged with a runtime type
 
----
+``` c
+typedef enum {
+    DICT_TYPE_INT,
+    DICT_TYPE_DOUBLE,
+    DICT_TYPE_STRING
+} DictType;
 
-## Memory Ownership Rules
+typedef struct {
+    DictType type;
+    union {
+        int    i;
+        double d;
+        char  *s;
+    };
+} DictValue;
+```
 
-### Dict
-- Allocated with `dict_create`
-- Freed with `dict_destroy`
-- The caller owns the `Dict*` handle
+The dictionary itself uses a fixed-size array of entry pointers:
 
-### Keys (`key`)
-- Keys passed to the library are **copied internally**
-- The caller retains ownership of the original key string
-- The caller may free or reuse the key after insertion
+-   collisions are resolved using **double hashing**
+-   no linked lists
+-   no tombstones
+-   lookup and insertion are `O(1)` average, `O(n)` worst-case
 
-### Values (`DictValue`)
-- Values are allocated and freed internally by the library
-- Values returned to the caller are **copies**
-- The caller must not free internal dictionary memory
+------------------------------------------------------------------------
 
----
+## 🚀 Getting Started
 
-## Error Handling
+### Create a dictionary
 
-- No public API function returns `void`
-- Success and failure are always explicit
-- Standard convention:
-  - `1` → success
-  - `0` → failure
+``` c
+Dict *dict = dict_create(128);
+if (!dict) {
+    fprintf(stderr, "%s\n", dict_error_string(dict_last_error()));
+    return 1;
+}
+```
 
-On failure:
-- Output parameters are not modified
-- Dictionary state remains unchanged
+------------------------------------------------------------------------
 
----
+### Insert values
 
-## Collision Policy
+``` c
+dict_put_int(dict, "age", 42);
+dict_put_double(dict, "pi", 3.14159);
+dict_put_string(dict, "name", "Mario");
+```
 
-- Hash collisions are possible
-- If collision handling is not implemented:
-  - Insertions fail cleanly
-  - The function returns `0`
-- The library **never returns a value associated with a different key**
+All keys and values are **deep-copied** internally.
 
-Failing is always preferable to returning incorrect data.
+------------------------------------------------------------------------
 
----
+### Retrieve values
 
-## API Reference
+``` c
+DictValue v;
+if (dict_get(dict, "age", &v)) {
+    printf("%d\n", v.i);
+}
+```
 
-### dict_create
+⚠️ If the value type is `DICT_TYPE_STRING`, the caller **must free**
+`v.s`.
 
-**Description**  
-Creates a new dictionary with a fixed capacity.
+------------------------------------------------------------------------
 
-**Parameters**
-- `capacity` > 0
+### Update existing values
 
-**Returns**
-- Pointer to a valid `Dict` on success
-- `NULL` on allocation failure
+``` c
+dict_upd_int(dict, "age", 43);
+dict_upd_string(dict, "name", "Luigi");
+```
 
-**Ownership**
-- Caller owns the returned dictionary
+Type mismatch during update is reported as an error.
 
----
+------------------------------------------------------------------------
 
-### dict_put_*
+### Remove values
 
-**Description**  
-Inserts a key → value pair into the dictionary.
+``` c
+DictValue v;
+if (dict_take(dict, "age", &v)) {
+    printf("%d\n", v.i);
+}
+```
 
-**Parameters**
-- `dict` must not be `NULL`
-- `key` must not be `NULL` and must be a null-terminated string
+-   The entry is removed from the dictionary
+-   The value is deep-copied into `v`
+-   Caller owns the copied value
 
-**Behavior**
-- The key is copied internally
-- The value is copied internally
-- If a collision occurs, insertion fails
+------------------------------------------------------------------------
 
-**Returns**
-- `1` on successful insertion
-- `0` on failure (collision, invalid input, allocation failure)
+### Cleanup and destroy
 
-**Ownership**
-- The caller retains ownership of `key`
+``` c
+dict_cleanup(dict);  // removes all entries, dictionary reusable
+dict_destroy(dict);  // frees everything
+```
 
----
+------------------------------------------------------------------------
 
-### dict_get
+## ⚠️ Memory Ownership Rules
 
-**Description**  
-Retrieves the value associated with a key without removing it.
+  Operation        Ownership
+  ---------------- ----------------------------
+  Insert (`put`)   Library owns internal data
+  Get (`get`)      Caller owns copied value
+  Take (`take`)    Caller owns copied value
+  Destroy          Frees all internal memory
 
-**Parameters**
-- `dict`, `key`, `out` must not be `NULL`
+Failing to call `dict_destroy()` will result in memory leaks.
 
-**Behavior**
-- If the key exists, `out` is written
-- If the key does not exist, `out` is not modified
+------------------------------------------------------------------------
 
-**Returns**
-- `1` if the key was found
-- `0` if the key was not found or on error
+## ❗ Error Handling
 
----
+The library uses an explicit error system:
 
-### dict_take
+``` c
+int err = dict_last_error();
+fprintf(stderr, "%s\n", dict_error_string(err));
+```
 
-**Description**  
-Retrieves and removes the value associated with a key.
+Errors are: - cleared at the beginning of each public API call - never
+printed internally - never mixed with `errno`
 
-**Parameters**
-- `dict`, `key`, `out` must not be `NULL`
+------------------------------------------------------------------------
 
-**Behavior**
-- If the key exists:
-  - The value is copied into `out`
-  - The entry is removed from the dictionary
-- If the key does not exist:
-  - No state change occurs
+## 🧪 Assertions & Debugging
 
-**Returns**
-- `1` if the element was removed
-- `0` if the key was not found or on error
+The implementation uses `assert()` extensively to enforce invariants
+such as: - valid dictionary pointers - bounds-checked hash indices -
+internal consistency
 
----
+Compile with `-DNDEBUG` to disable assertions in production builds.
 
-### dict_cleanup
+------------------------------------------------------------------------
 
-**Description**  
-Removes all entries from the dictionary.
+## 📦 Build Example
 
-**Behavior**
-- Frees all internal entries
-- The dictionary remains valid and reusable
+``` bash
+gcc -Wall -Wextra -g     dict.c dict_err.c hash.c     -o app
+```
 
----
+Valgrind-clean when used correctly:
 
-### dict_destroy
+``` bash
+valgrind --leak-check=full ./app
+```
 
-**Description**  
-Destroys the dictionary and releases all associated resources.
+------------------------------------------------------------------------
 
-**Behavior**
-- Frees all internal memory
-- After this call, the dictionary pointer is invalid
+## 📌 Limitations
 
----
+-   Fixed capacity (no resizing)
+-   Keys must be null-terminated strings
+-   Not thread-safe
+-   No tombstone handling (removed entries free the slot)
 
-## Guarantees
+These choices are intentional to keep the implementation simple and
+predictable.
 
-- No function returns incorrect data
-- No function intentionally causes undefined behavior
-- All ownership rules are explicit and stable
-
----
-
-## Notes
-
-This contract defines the **semantic behavior** of the API.
-Any implementation must adhere to this contract to be considered correct.
-
-
-
-Todo:
-- 🔴 [dict.c] collision handling in dict_put
-- 🔴 [dict.c] implement a proper resizing strategy for the hash table when load factor > 0.7.
-- 🔴 [dict.c] change the 'put' logic, it should handle occupancy properly.
-- 🟠 changing how we put the type throw dict_put function passing type directly in dict_put
+## 📌 Todo List
+- 🔴 [dict.c] add tombstone handling
+- 🔴 [dict.c] implement a proper resizing strategy for the hash table.
+- 🔴 [hash.c] add support for custom hash functions provided by the user
 - 🟠 [dict.c] create another Dict type where it stores only void* ptr in items.
 - 🟢 [dict.c] @example summary not displayed in preview
+
+------------------------------------------------------------------------
+
+## 📄 License
+
+MIT License
+
+------------------------------------------------------------------------
+
+## ✍️ Author
+
+Matteo Marchetti\
+Low-level C data structures & systems programming

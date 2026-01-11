@@ -29,6 +29,8 @@ const char *dict_error_string(DictError err) {
             return "Key not found";
         case DICT_ERR_INVALID_CAPACITY:
             return "Invalid capacity (must be > 0)";
+        case DICT_ERR_DICT_FULL:
+            return "Dictionary is full - no more insertion";
         default:
             return "Unknown error";
     }

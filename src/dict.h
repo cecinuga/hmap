@@ -6,6 +6,7 @@
 
 /* ====== Dictionary constants. ====== */
 #define INVALID_CELL UINT32_MAX
+#define DICT_CAP 701
 #define DICT_HASH_PRIMARY "djb2"
 #define DICT_HASH_SECONDARY "fnv1a"
 

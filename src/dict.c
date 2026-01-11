@@ -72,7 +72,7 @@ static void free_entry(DictEntry *entry){
     free(entry);
 }
 
-uint32_t get_empty_cell(Dict *dict, char *key){
+static uint32_t get_empty_cell(Dict *dict, char *key){
     uint32_t i = 0;
     uint32_t cell = double_hash(key, i, dict->capacity);
         
@@ -85,11 +85,12 @@ uint32_t get_empty_cell(Dict *dict, char *key){
         i++;
         cell = double_hash(key, i, dict->capacity);
     }
-
+    assert(cell < dict->capacity);
+    
     return cell;
 }
 
-uint32_t get_key_cell(Dict *dict, char *key){
+static uint32_t get_key_cell(Dict *dict, char *key){
     uint32_t cell, i = 0;
     do {
         cell = double_hash(key, i, dict->capacity);
@@ -97,9 +98,11 @@ uint32_t get_key_cell(Dict *dict, char *key){
         if(i == dict->capacity)
             SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, INVALID_CELL);
     } while(!is_avaible(dict, cell) && strcmp(dict->entries[cell]->key, key) != 0);
-
+    assert(cell < dict->capacity);
+    
     if (is_avaible(dict, cell))
         SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, INVALID_CELL);
+    
 
     return cell;
 }
@@ -383,6 +386,15 @@ int dict_upd_string(Dict *dict, char *key, char *val){
     if(old->type != DICT_TYPE_STRING)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
 
+    size_t len = strlen(val) + 1;
+    char *tmp = realloc(old->s, len);
+    if (!tmp) {
+        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
+    }
+
+    old->s = tmp;
+    strcpy(old->s, val);
+
     strcpy(old->s, val);
 
     return 1;
@@ -452,11 +464,11 @@ int dict_take(Dict *dict, char *key, DictValue *out){
     if(dict == NULL || key == NULL || out == NULL)
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    uint32_t cell = get_empty_cell(dict, key); 
+    uint32_t cell = get_key_cell(dict, key); 
     if(cell == INVALID_CELL)
         return 0;
         
-    DictValue *val = get_dict_value(dict, key); // CALCULATED 2 TIMES THE HASH FUNCTION, INPROVE
+    DictValue *val = get_dict_value(dict, key);
 
     dict_value_copy(out, val);
 

@@ -72,6 +72,10 @@ static void free_entry(DictEntry *entry){
     free(entry);
 }
 
+/// @brief Finds an empty slot for a given key using **double hashing**.
+/// @param dict Dictionary pointer (must not be NULL)
+/// @param key Key string (must not be NULL)
+/// @return cell on success, INVALID_CELL otherwise
 static uint32_t get_empty_cell(Dict *dict, char *key){
     uint32_t i = 0;
     uint32_t cell = double_hash(key, i, dict->capacity);
@@ -90,6 +94,10 @@ static uint32_t get_empty_cell(Dict *dict, char *key){
     return cell;
 }
 
+/// @brief Finds the slot that store the given key using **double hashing**.
+/// @param dict Dictionary pointer (must not be NULL)
+/// @param key Key string (must not be NULL)
+/// @return cell on success, INVALID_CELL otherwise
 static uint32_t get_key_cell(Dict *dict, char *key){
     uint32_t cell, i = 0;
     do {
@@ -98,15 +106,19 @@ static uint32_t get_key_cell(Dict *dict, char *key){
         if(i == dict->capacity)
             SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, INVALID_CELL);
     } while(!is_avaible(dict, cell) && strcmp(dict->entries[cell]->key, key) != 0);
+   
     assert(cell < dict->capacity);
-    
     if (is_avaible(dict, cell))
         SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, INVALID_CELL);
     
-
     return cell;
 }
 
+/// @brief Retrieves the value associated with a given key from the dictionary.
+/// @param dict Dictionary pointer (must not be NULL)
+/// @param key Key string (must not be NULL)
+/// @note The value is a shallow copy so will be freed with dict_destroy().
+/// @return DictValue on success, NULL otherwise
 static DictValue *get_dict_value(Dict *dict, char *key){
     assert(dict);
     assert(key);

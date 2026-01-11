@@ -38,6 +38,7 @@ typedef struct {
 typedef struct {
     uint32_t size; // How many items are actualy storing.
     uint32_t capacity; // How many items can store.
+    DoubleHashFunction hfn; // Hash function used internally
 
     DictEntry **entries; // List of items.
 } Dict;

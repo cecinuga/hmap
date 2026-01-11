@@ -19,7 +19,6 @@ static void dict_value_copy(DictValue *dest, const DictValue *src){
     assert(dest && src);
 
     dest->type = src->type;
-
     switch (src->type) {
     case DICT_TYPE_INT:
         dest->i = src->i;
@@ -78,7 +77,7 @@ static void free_entry(DictEntry *entry){
 /// @return cell on success, INVALID_CELL otherwise
 static uint32_t get_empty_cell(Dict *dict, char *key){
     uint32_t i = 0;
-    uint32_t cell = double_hash(key, i, dict->capacity);
+    uint32_t cell = dict->hfn(key, i, dict->capacity);
         
     while(!is_avaible(dict, cell)){
         if(strcmp(dict->entries[cell]->key, key) == 0)
@@ -87,7 +86,7 @@ static uint32_t get_empty_cell(Dict *dict, char *key){
             SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, INVALID_CELL);
 
         i++;
-        cell = double_hash(key, i, dict->capacity);
+        cell = dict->hfn(key, i, dict->capacity);
     }
     assert(cell < dict->capacity);
     
@@ -101,7 +100,7 @@ static uint32_t get_empty_cell(Dict *dict, char *key){
 static uint32_t get_key_cell(Dict *dict, char *key){
     uint32_t cell, i = 0;
     do {
-        cell = double_hash(key, i, dict->capacity);
+        cell = dict->hfn(key, i, dict->capacity);
         i++;
         if(i == dict->capacity)
             SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, INVALID_CELL);
@@ -157,6 +156,7 @@ Dict *dict_create(uint32_t capacity){
     d->size = 0;
     d->capacity = capacity;
     d->entries = calloc(capacity, sizeof(DictEntry*));
+    d->hfn = double_bad_hash; // TESTING COLLISION 
     if (d->entries == NULL) {
         dict_destroy(d);
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);

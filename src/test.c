@@ -63,26 +63,18 @@ int basic_test(){
       char key[16];
       sprintf(key, "key_%d", i);
 
-      DictValue *v = malloc(sizeof(*v));
-      if(v == NULL) {
-        perror("error allocating memory.");
-        free(v);
-        dict_destroy(dict);
-        return 1;
-      }
+      DictValue v;
       
-      int res = dict_take(dict, key, v);
+      int res = dict_take(dict, key, &v);
       if(!res){
         printf("-------key: %s\n", key);
         perror(dict_error_string(dict_last_error()));
-        free(v);
         dict_destroy(dict);
         return 1;
       }
 
       assert(dict->size == (uint32_t)DICT_MAX_SIZE-(i+1));
-      assert(v->i == i+1);
-      free(v);
+      assert(v.i == i+1);
     }
 
     printf("dict size is: %d\n", dict->size);

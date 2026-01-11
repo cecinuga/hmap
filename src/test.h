@@ -1,2 +1,2 @@
-int basic_test();
-int bad_hash_test();
+int probing_test();
+int functional_test();

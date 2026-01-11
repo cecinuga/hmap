@@ -6,7 +6,25 @@
 
 #define DICT_MAX_SIZE 104
 
-int basic_test(){
+int probing_test(){
+    int *visited = calloc(DICT_CAP, sizeof(int));
+
+    for (uint32_t i = 0; i < DICT_CAP; i++) {
+        char key[16];
+        sprintf(key, "key_%d", i);
+
+        uint32_t cell = double_hash(key, i, DICT_CAP);
+
+        printf("key: %s, cell: %zu, state: %d\n", key, cell, visited[cell]);
+        assert(!visited[cell]);
+
+        visited[cell] = 1;
+    }
+
+    return 0;
+}
+
+int functional_test(){
     Dict *dict = dict_create(DICT_CAP);
     if (!dict) return 1;
 
@@ -81,23 +99,6 @@ int basic_test(){
     assert(dict->size == 0);
     printf("\n[+] .....SUCCESS.....\n");
     dict_destroy(dict);
-
-    return 0;
-}
-
-int hash(){
-    int visited[DICT_CAP] = {0};
-
-    for (uint32_t i = 0; i < DICT_CAP; i++) {
-        char key[16];
-        sprintf(key, "key_%d", i);
-
-        uint32_t cell = double_hash(key, i, DICT_CAP);
-        printf("%ud",cell);
-        assert(!visited[cell]);
-
-        visited[cell] = 1;
-    }
 
     return 0;
 }

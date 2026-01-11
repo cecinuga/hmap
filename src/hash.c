@@ -35,14 +35,14 @@ uint64_t bad_hash2(const char *key) {
     return h | 1; // garantisce passo ≠ 0
 }
 
-uint32_t double_hash(char *key, uint32_t i, uint32_t size){
+uint32_t double_hash(const char *key, uint32_t i, uint32_t size){
     uint32_t h1 = hash_djb2(key);
     uint32_t h2 = (hash_fnv1a(key) % (size-1)) + 1;
 
     return (h1 + i*h2)%size; 
 }
 
-uint32_t double_bad_hash(char *key, uint32_t i, uint32_t size){
+uint32_t double_bad_hash(const char *key, uint32_t i, uint32_t size){
     uint32_t h1 = bad_hash(key);
     uint32_t h2 = (bad_hash2(key) % (size-1)) + 1;
 

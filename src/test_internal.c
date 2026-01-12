@@ -54,3 +54,20 @@ int full_dict_test(){
     dict_destroy(dict);
     return 0;
 }
+
+void run_test(){
+    int res;
+    res = collision_test();
+    if(!res){
+      perror("[!] Failed collision test.\n");
+    } else {
+      printf("[+] Success collion test.\n");
+    }
+
+    res = full_dict_test();
+    if(!res){
+      perror("[!] Failed full dictionary test.\n");
+    } else {
+      printf("[+] Success full dictionary test.\n");
+    }
+}

@@ -3,5 +3,6 @@
 
 int collision_test();
 int full_dict_test();
+int run_test();
 
 #endif

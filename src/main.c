@@ -5,20 +5,8 @@
 #include "dict_public.h"
 
 int main(void){
-    int res;
-    res = collision_test();
-    if(!res){
-      perror("[!] Failed collision test.\n");
-    } else {
-      printf("[+] Success collion test.\n");
-    }
 
-    res = full_dict_test();
-    if(!res){
-      perror("[!] Failed full dictionary test.\n");
-    } else {
-      printf("[+] Success full dictionary test.\n");
-    }
+    run_test();
 
     return 0;
 }

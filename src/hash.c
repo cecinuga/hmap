@@ -26,13 +26,12 @@ uint64_t hash_fnv1a(const char *key) {
 
 uint64_t bad_hash(const char *key) {
     (void)key;
-    return 42;
+    return 1;
 }
 
 uint64_t bad_hash2(const char *key) {
-    uint64_t h = 0;
-    while (*key) h += *key++;
-    return h | 1; // garantisce passo ≠ 0
+    (void)key;
+    return 0;
 }
 
 uint32_t double_hash(const char *key, uint32_t i, uint32_t size){

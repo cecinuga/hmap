@@ -3,19 +3,33 @@
 #include <assert.h>
 #include <string.h>
 #include "hash.h"
-#include "dict.h"
+#include "dict_struct.h"
+#define DICT_TESTING
+#include "dict_internal.h"
+#include "dict_public.h"
 #include "dict_err.h"
 
-/* ========== PRIVATE HELPERS ========== */
-
-/* Convert a key into cell position using the dict hash function. */
+/// @brief Frees all memory associated with a dictionary entry.
+/// @param entry Entry to free (must not be NULL)
+/// @note Asserts if entry is NULL
+/// @note Frees key, value, and string data if type is DICT_TYPE_STRING
+INTERNAL void free_entry(DictEntry *entry){
+    assert(entry != NULL);
+    if(entry->value->type==DICT_TYPE_STRING && entry->value->s != NULL)
+        free(entry->value->s);
+    if(entry->value != NULL) 
+        free(entry->value);
+    if(entry->key != NULL) 
+        free(entry->key);
+    free(entry);
+}
 
 /// @brief Perform deep-copy of `src` into `dest`.
 /// @param dest Destination value (must not be NULL)
 /// @param src Source value (must not be NULL)
 /// @note Asserts if either parameter is NULL
 /// @note For DICT_TYPE_STRING, allocates memory that must be freed by caller
-static void dict_value_copy(DictValue *dest, const DictValue *src){
+INTERNAL void dict_value_copy(DictValue *dest, const DictValue *src){
     assert(dest && src);
 
     dest->type = src->type;
@@ -41,7 +55,7 @@ static void dict_value_copy(DictValue *dest, const DictValue *src){
 /// @param cell Cell index to check (must be < dict->capacity)
 /// @return 1 if cell is NULL (available), 0 otherwise
 /// @note Asserts if dict is NULL or cell is out of bounds
-static int is_avaible(Dict *dict, uint32_t cell){
+INTERNAL int is_avaible(Dict *dict, uint32_t cell){
     assert(dict != NULL);
     assert(cell < dict->capacity);
     return dict->entries[cell] == NULL ? 1: 0;
@@ -51,40 +65,25 @@ static int is_avaible(Dict *dict, uint32_t cell){
 /// @param dict Dictionary pointer (must not be NULL)
 /// @return 1 if empty (size == 0), 0 otherwise
 /// @note Asserts if dict is NULL
-static int is_empty(Dict *dict){
+INTERNAL int is_empty(Dict *dict){
     assert(dict != NULL);
     return dict->size == 0;
-}
-
-/// @brief Frees all memory associated with a dictionary entry.
-/// @param entry Entry to free (must not be NULL)
-/// @note Asserts if entry is NULL
-/// @note Frees key, value, and string data if type is DICT_TYPE_STRING
-static void free_entry(DictEntry *entry){
-    assert(entry != NULL);
-    if(entry->value->type==DICT_TYPE_STRING && entry->value->s != NULL)
-        free(entry->value->s);
-    if(entry->value != NULL) 
-        free(entry->value);
-    if(entry->key != NULL) 
-        free(entry->key);
-    free(entry);
 }
 
 /// @brief Finds an empty slot for a given key using **double hashing**.
 /// @param dict Dictionary pointer (must not be NULL)
 /// @param key Key string (must not be NULL)
 /// @return cell on success, INVALID_CELL otherwise
-static uint32_t get_empty_cell(Dict *dict, char *key){
+INTERNAL uint32_t get_empty_cell(Dict *dict, char *key){
     uint32_t i = 0;
     uint32_t cell = dict->hfn(key, i, dict->capacity);
         
     while(!is_avaible(dict, cell)){
         if(strcmp(dict->entries[cell]->key, key) == 0)
             SET_ERROR_AND_RETURN(DICT_ERR_ALR_INSERTED, INVALID_CELL);
-        if(i == dict->capacity)
+        if(i == dict->capacity){
             SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, INVALID_CELL);
-
+        }
         i++;
         cell = dict->hfn(key, i, dict->capacity);
     }
@@ -97,7 +96,7 @@ static uint32_t get_empty_cell(Dict *dict, char *key){
 /// @param dict Dictionary pointer (must not be NULL)
 /// @param key Key string (must not be NULL)
 /// @return cell on success, INVALID_CELL otherwise
-static uint32_t get_key_cell(Dict *dict, char *key){
+INTERNAL uint32_t get_key_cell(Dict *dict, char *key){
     uint32_t cell, i = 0;
     do {
         cell = dict->hfn(key, i, dict->capacity);
@@ -118,7 +117,7 @@ static uint32_t get_key_cell(Dict *dict, char *key){
 /// @param key Key string (must not be NULL)
 /// @note The value is a shallow copy so will be freed with dict_destroy().
 /// @return DictValue on success, NULL otherwise
-static DictValue *get_dict_value(Dict *dict, char *key){
+INTERNAL DictValue *get_dict_value(Dict *dict, char *key){
     assert(dict);
     assert(key);
     dict_clear_error();
@@ -130,44 +129,6 @@ static DictValue *get_dict_value(Dict *dict, char *key){
     return dict->entries[cell]->value;
 }
 
-/**
- * Creates a new dictionary with a fixed capacity.
- * 
- * @param capacity Number of entries the dictionary can hold (must be > 0)
- * @return Pointer to newly created Dict on success, NULL on failure
- * 
- * @note Caller owns the returned dictionary and must free it with dict_destroy()
- * @note Clears error state at start
- * @example 
- * Dict *d = dict_create(100);
- *   if (d == NULL) {
- *       fprintf(stderr, "Error: %s\n", dict_error_string(dict_last_error()));
- *   }
- */
-Dict *dict_create(uint32_t capacity){
-    dict_clear_error();
-    if(capacity == 0) 
-        SET_ERROR_AND_RETURN(DICT_ERR_INVALID_CAPACITY, NULL);
-
-    Dict *d = malloc(sizeof(Dict));
-    if(d == NULL) 
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
-
-    d->size = 0;
-    d->capacity = capacity;
-    d->entries = calloc(capacity, sizeof(DictEntry*));
-    d->hfn = double_bad_hash; // TESTING COLLISION 
-    if (d->entries == NULL) {
-        dict_destroy(d);
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
-    }
-
-    return d;
-}
-
-
-/* ========== START API INSERT IMPLEMENTATIONS ========== */
-
 /// @brief Internal function to insert a key-value pair into the dictionary.
 /// @param dict Dictionary pointer (must not be NULL)
 /// @param key Key string (must not be NULL)
@@ -175,7 +136,7 @@ Dict *dict_create(uint32_t capacity){
 /// @return 1 on success, 0 on failure
 /// @note Asserts if any parameter is NULL
 /// @note Clears error state at start
-static int dict_put(Dict *dict, char *key, DictValue *item){   
+INTERNAL int dict_put(Dict *dict, char *key, DictValue *item){   
     dict_clear_error();
     assert(dict != NULL);
     assert(key != NULL);
@@ -211,6 +172,41 @@ static int dict_put(Dict *dict, char *key, DictValue *item){
     assert(dict->size <= dict->capacity);
 
     return 1;
+}
+
+/**
+ * Creates a new dictionary with a fixed capacity.
+ * 
+ * @param capacity Number of entries the dictionary can hold (must be > 0)
+ * @return Pointer to newly created Dict on success, NULL on failure
+ * 
+ * @note Caller owns the returned dictionary and must free it with dict_destroy()
+ * @note Clears error state at start
+ * @example 
+ * Dict *d = dict_create(100);
+ *   if (d == NULL) {
+ *       fprintf(stderr, "Error: %s\n", dict_error_string(dict_last_error()));
+ *   }
+ */
+Dict *dict_create(uint32_t capacity){
+    dict_clear_error();
+    if(capacity == 0) 
+        SET_ERROR_AND_RETURN(DICT_ERR_INVALID_CAPACITY, NULL);
+
+    Dict *d = malloc(sizeof(Dict));
+    if(d == NULL) 
+        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
+
+    d->size = 0;
+    d->capacity = capacity;
+    d->entries = calloc(capacity, sizeof(DictEntry*));
+    d->hfn = double_hash; // TESTING COLLISION 
+    if (d->entries == NULL) {
+        dict_destroy(d);
+        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
+    }
+
+    return d;
 }
 
 /**

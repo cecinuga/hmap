@@ -196,7 +196,6 @@ These choices are intentional to keep the implementation simple and
 predictable.
 
 ## 📌 Todo List
-- 🔴 [dict.c] test collision handling
 - 🔴 [dict.c] add tombstone handling
 - 🔴 [dict.c] implement a proper resizing strategy for the hash table.
 - 🔴 [hash.c] add support for custom hash functions provided by the user

@@ -1,3 +1,8 @@
+#ifndef DICT_H_ERROR
+#define DICT_H_ERROR
+
+#include "dict_struct.h"
+
 /* ========== ERROR HANDLING ========== */
 
 typedef enum {
@@ -29,3 +34,6 @@ const char *dict_error_string(DictError err);
         return (retval);                 \
     } while (0)
     
+
+#endif
+

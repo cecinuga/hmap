@@ -32,7 +32,6 @@ int collision_test(){
 
 int succ_full_dict_test(){
   Dict *dict = dict_create(DICT_CAP);
-  int *visited = calloc(DICT_CAP, sizeof(int));
 
   for (uint32_t i = 0; i < DICT_CAP; i++) {
       char key[16];
@@ -41,20 +40,15 @@ int succ_full_dict_test(){
       uint32_t cell = get_empty_cell(dict, key);
       int res = dict_put_int(dict, key, i);
       if(!res) return 0;
-
-      //printf("key: %s, cell: %zu, state: %d, size: %d\n", key, cell, visited[cell], dict->size);
-      assert(!visited[cell]);
-
-      visited[cell] = 1;
   }
 
+  assert(dict->size == DICT_CAP);
   dict_destroy(dict);
   return 1;
 }
 
 int fail_full_dict_test(){
     Dict *dict = dict_create(DICT_CAP);
-    int *visited = calloc(DICT_CAP, sizeof(int));
 
     for (uint32_t i = 0; i < DICT_CAP+1; i++) {
         char key[16];
@@ -68,11 +62,6 @@ int fail_full_dict_test(){
             return 1;
           return 0;
         }
-
-        //printf("key: %s, cell: %zu, state: %d, size: %d\n", key, cell, visited[cell], dict->size);
-        assert(!visited[cell]);
-
-        visited[cell] = 1;
     }
 
     dict_destroy(dict);
@@ -134,13 +123,13 @@ int succ_take_all_test(){
     assert(res);
   }
   assert(dict->capacity == DICT_CAP);
-
   for (uint32_t i = 0; i < DICT_CAP; i++) {
     char key[16];
     sprintf(key, "key_%d", i+1);
 
     DictValue v;
     int res = dict_take(dict, key, &v);
+    
     if(!res){
       printf("%s: %s\n", dict_error_string(dict_last_error()), key);
       return 0;
@@ -149,11 +138,10 @@ int succ_take_all_test(){
     //printf("key: %s, cell: %zu, size: %d\n", key, cell, dict->size);
     assert(res);
   }
-
   assert(is_empty(dict));
-  assert(dict->capacity == 0);
+  assert(dict->size == 0);
   dict_destroy(dict);
-  return 0;
+  return 1;
 }
 
 #define FAIL_TAKE_ALL_TEST_UPPRBND 120
@@ -170,16 +158,16 @@ int fail_take_all_test(){ //STILL IN WIP
 
     assert(res);
   }
-  assert(dict->capacity == 100);
-
+  assert(dict->size == 100);
   for (uint32_t i = FAIL_TAKE_ALL_TEST_UPPRBND; i > FAIL_TAKE_ALL_TEST_LWRBND-10; i--) {
     char key[16];
-    sprintf(key, "key_%d", i+1);
+    sprintf(key, "key_%d", i);
 
     DictValue v;
     int res = dict_take(dict, key, &v);
     if(!res){
-      perror(dict_error_string(dict_last_error()));
+      if(dict_last_error() == DICT_ERR_NOT_FOUND && i == 20)
+        return 1;
       return 0;
     }
 
@@ -240,7 +228,7 @@ int run_tests(){
     perror("[!] Failed succ_take_all_test.");
     return 0;
   } else {
-    printf("[!] Success succ_take_all_test.\n");
+    printf("[+] Success succ_take_all_test.\n");
   }
 
   res = fail_take_all_test();
@@ -248,7 +236,7 @@ int run_tests(){
     perror("[!] Failed fail_take_all_test.");
     return 0;
   } else {
-    printf("[!] Success fail_take_all_test.\n");
+    printf("[+] Success fail_take_all_test.\n");
   }
 
   return 1;

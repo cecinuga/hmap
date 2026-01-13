@@ -18,7 +18,7 @@ int collision_test(){
 
         uint32_t cell = get_empty_cell(dict, key);
         int res = dict_put_int(dict, key, i);
-        if(!res) return 1;
+        if(!res) return 0;
 
         //printf("key: %s, cell: %zu, state: %d, size: %d\n", key, cell, visited[cell], dict->size);
         assert(!visited[cell]);
@@ -30,7 +30,29 @@ int collision_test(){
     return 1;
 }
 
-int full_dict_test(){
+int succ_full_dict_test(){
+  Dict *dict = dict_create(DICT_CAP);
+  int *visited = calloc(DICT_CAP, sizeof(int));
+
+  for (uint32_t i = 0; i < DICT_CAP; i++) {
+      char key[16];
+      sprintf(key, "key_%d", i+1);
+
+      uint32_t cell = get_empty_cell(dict, key);
+      int res = dict_put_int(dict, key, i);
+      if(!res) return 0;
+
+      //printf("key: %s, cell: %zu, state: %d, size: %d\n", key, cell, visited[cell], dict->size);
+      assert(!visited[cell]);
+
+      visited[cell] = 1;
+  }
+
+  dict_destroy(dict);
+  return 1;
+}
+
+int fail_full_dict_test(){
     Dict *dict = dict_create(DICT_CAP);
     int *visited = calloc(DICT_CAP, sizeof(int));
 
@@ -39,11 +61,13 @@ int full_dict_test(){
         sprintf(key, "key_%d", i+1);
 
         uint32_t cell = get_empty_cell(dict, key);
-        if(cell == INVALID_CELL && dict_last_error() != DICT_OK){
-            //printf("%s\n", dict_error_string(dict_last_error()));
-            return 1;
-        }
         int res = dict_put_int(dict, key, i);
+        
+        if(!res){
+          if(i == DICT_CAP && dict_last_error() == DICT_ERR_DICT_FULL)
+            return 1;
+          return 0;
+        }
 
         //printf("key: %s, cell: %zu, state: %d, size: %d\n", key, cell, visited[cell], dict->size);
         assert(!visited[cell]);
@@ -55,49 +79,100 @@ int full_dict_test(){
     return 0;
 }
 
-int put_full_test(){
+int succ_put_full_test(){
+  Dict *dict = dict_create(DICT_CAP);
+
+  for (uint32_t i = 0; i < DICT_CAP; i++) {
+        char key[16];
+        sprintf(key, "key_%d", i+1);
+
+        int res = dict_put_int(dict, key, i);
+        if(!res) return 0;
+
+        //printf("key: %s, cell: %zu, size: %d\n", key, cell, dict->size);
+        assert(res);
+    }
+
+    assert(dict->capacity == DICT_CAP);
+    dict_destroy(dict);
+    return 1;
+}
+
+int fail_put_full_test(){
   Dict *dict = dict_create(DICT_CAP);
 
   for (uint32_t i = 0; i < DICT_CAP+1; i++) {
         char key[16];
         sprintf(key, "key_%d", i+1);
 
-        uint32_t cell = get_empty_cell(dict, key);
-        if(cell == INVALID_CELL && dict_last_error() != DICT_OK){
-            //printf("%s\n", dict_error_string(dict_last_error()));
-            return 1;
-        }
         int res = dict_put_int(dict, key, i);
+        if(!res){
+          if(i == DICT_CAP && dict_last_error() == DICT_ERR_DICT_FULL)
+            return 1;
+          return 0;
+        }
 
         //printf("key: %s, cell: %zu, size: %d\n", key, cell, dict->size);
         assert(res);
     }
-    
+
     assert(dict->capacity == DICT_CAP);
     dict_destroy(dict);
     return 0;
 }
 
-int take_all_test(){
+int succ_take_all_test(){
   Dict *dict = dict_create(DICT_CAP);
 
-  for (uint32_t i = 0; i < DICT_CAP+1; i++) {
+  for (uint32_t i = 0; i < DICT_CAP; i++) {
     char key[16];
     sprintf(key, "key_%d", i+1);
 
-    uint32_t cell = get_empty_cell(dict, key);
-    if(cell == INVALID_CELL && dict_last_error() != DICT_OK){
-        //printf("%s\n", dict_error_string(dict_last_error()));
-        return 1;
-    }
     int res = dict_put_int(dict, key, i);
+    if(!res) return 0;
 
-    //printf("key: %s, cell: %zu, size: %d\n", key, cell, dict->size);
     assert(res);
   }
   assert(dict->capacity == DICT_CAP);
 
-  for (uint32_t i = 0; i < DICT_CAP+1; i++) {
+  for (uint32_t i = 0; i < DICT_CAP; i++) {
+    char key[16];
+    sprintf(key, "key_%d", i+1);
+
+    DictValue v;
+    int res = dict_take(dict, key, &v);
+    if(!res){
+      printf("%s: %s\n", dict_error_string(dict_last_error()), key);
+      return 0;
+    }
+
+    //printf("key: %s, cell: %zu, size: %d\n", key, cell, dict->size);
+    assert(res);
+  }
+
+  assert(is_empty(dict));
+  assert(dict->capacity == 0);
+  dict_destroy(dict);
+  return 0;
+}
+
+#define FAIL_TAKE_ALL_TEST_UPPRBND 120
+#define FAIL_TAKE_ALL_TEST_LWRBND 20
+int fail_take_all_test(){ //STILL IN WIP
+  Dict *dict = dict_create(DICT_CAP);
+
+  for (uint32_t i = FAIL_TAKE_ALL_TEST_LWRBND; i < FAIL_TAKE_ALL_TEST_UPPRBND; i++) {
+    char key[16];
+    sprintf(key, "key_%d", i+1);
+
+    int res = dict_put_int(dict, key, i);
+    if(!res) return 0;
+
+    assert(res);
+  }
+  assert(dict->capacity == 100);
+
+  for (uint32_t i = FAIL_TAKE_ALL_TEST_UPPRBND; i > FAIL_TAKE_ALL_TEST_LWRBND-10; i--) {
     char key[16];
     sprintf(key, "key_%d", i+1);
 
@@ -105,6 +180,7 @@ int take_all_test(){
     int res = dict_take(dict, key, &v);
     if(!res){
       perror(dict_error_string(dict_last_error()));
+      return 0;
     }
 
     //printf("key: %s, cell: %zu, size: %d\n", key, cell, dict->size);
@@ -122,34 +198,57 @@ int run_tests(){
 
   res = collision_test();
   if(!res){
-    perror("[!] Failed collision test.\n");
+    perror("[!] Failed collision test.");
     return 0;
   } else {
     printf("[+] Success collion test.\n");
   }
 
-  res = full_dict_test();
+  res = succ_full_dict_test();
   if(!res){
-    perror("[!] Failed full dictionary test.\n");
+    perror("[!] Failed succ_full_dict_test.");
     return 0;
   } else {
-    printf("[+] Success full dictionary test.\n");
+    printf("[+] Success succ_full_dict_test.\n");
+  }
+  res = fail_full_dict_test();
+  if(!res){
+    perror("[!] Failed fail_full_dict_test.");
+    return 0;
+  } else {
+    printf("[+] Success fail_full_dict_test.\n");
   }
   
-  res = put_full_test();
+  res = succ_put_full_test();
   if(!res){
-    perror("[!] Failed put full test.\n");
+    perror("[!] Failed succ_put_full_test.");
     return 0;
   } else {
-    printf("[!] Success put full dictionary test.\n");
+    printf("[+] Success succ_put_full_test.\n");
+  }
+  
+  res = fail_put_full_test();
+  if(!res){
+    perror("[!] Failed fail_put_full_test.");
+    return 0;
+  } else {
+    printf("[+] Success fail_put_full_test.\n");
   }
 
-  res = take_all_test();
+  res = succ_take_all_test();
   if(!res){
-    perror("[!] Failed take all test.\n");
+    perror("[!] Failed succ_take_all_test.");
     return 0;
   } else {
-    printf("[!] Success take all dictionary test.\n");
+    printf("[!] Success succ_take_all_test.\n");
+  }
+
+  res = fail_take_all_test();
+  if(!res){
+    perror("[!] Failed fail_take_all_test.");
+    return 0;
+  } else {
+    printf("[!] Success fail_take_all_test.\n");
   }
 
   return 1;

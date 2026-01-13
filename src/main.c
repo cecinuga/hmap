@@ -6,7 +6,7 @@
 
 int main(void){
 
-    run_test();
+    run_tests();
 
     return 0;
 }

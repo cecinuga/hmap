@@ -17,11 +17,9 @@ INTERNAL void free_entry(DictEntry *entry){
     assert(entry != NULL);
     if(entry->value->type==DICT_TYPE_STRING && entry->value->s != NULL)
         free(entry->value->s);
-    if(entry->value != NULL) 
-        free(entry->value);
-    if(entry->key != NULL) 
-        free(entry->key);
-    free(entry);
+
+    free(entry->key);
+    free(entry->value);
 }
 
 /// @brief Perform deep-copy of `src` into `dest`.
@@ -58,7 +56,7 @@ INTERNAL void dict_value_copy(DictValue *dest, const DictValue *src){
 INTERNAL int is_avaible(Dict *dict, uint32_t cell){
     assert(dict != NULL);
     assert(cell < dict->capacity);
-    return dict->entries[cell] == NULL ? 1: 0;
+    return dict->entries[cell].state == CELL_EMPTY ? 1: 0;
 }
 
 /// @brief Checks if dictionary is empty.
@@ -73,16 +71,16 @@ INTERNAL int is_empty(Dict *dict){
 /// @brief Finds an empty slot for a given key using **double hashing**.
 /// @param dict Dictionary pointer (must not be NULL)
 /// @param key Key string (must not be NULL)
-/// @return cell on success, INVALID_CELL otherwise
+/// @return cell on success, DICT_INVALID_CELL otherwise
 INTERNAL uint32_t get_empty_cell(Dict *dict, char *key){
     uint32_t i = 0;
     uint32_t cell = dict->hfn(key, i, dict->capacity);
         
     while(!is_avaible(dict, cell)){
-        if(strcmp(dict->entries[cell]->key, key) == 0)
-            SET_ERROR_AND_RETURN(DICT_ERR_ALR_INSERTED, INVALID_CELL);
+        if(strcmp(dict->entries[cell].key, key) == 0)
+            SET_ERROR_AND_RETURN(DICT_ERR_ALR_INSERTED, DICT_INVALID_CELL);
         if(i == dict->capacity){
-            SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, INVALID_CELL);
+            SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, DICT_INVALID_CELL);
         }
         i++;
         cell = dict->hfn(key, i, dict->capacity);
@@ -95,19 +93,19 @@ INTERNAL uint32_t get_empty_cell(Dict *dict, char *key){
 /// @brief Finds the slot that store the given key using **double hashing**.
 /// @param dict Dictionary pointer (must not be NULL)
 /// @param key Key string (must not be NULL)
-/// @return cell on success, INVALID_CELL otherwise
+/// @return cell on success, DICT_INVALID_CELL otherwise
 INTERNAL uint32_t get_key_cell(Dict *dict, char *key){
     uint32_t cell, i = 0;
     do {
         cell = dict->hfn(key, i, dict->capacity);
         i++;
         if(i == dict->capacity)
-            SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, INVALID_CELL);
-    } while(!is_avaible(dict, cell) && strcmp(dict->entries[cell]->key, key) != 0);
+            SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, DICT_INVALID_CELL);
+    } while(!is_avaible(dict, cell) && strcmp(dict->entries[cell].key, key) != 0);
    
     assert(cell < dict->capacity);
     if (is_avaible(dict, cell))
-        SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, INVALID_CELL);
+        SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, DICT_INVALID_CELL);
     
     return cell;
 }
@@ -123,10 +121,10 @@ INTERNAL DictValue *get_dict_value(Dict *dict, char *key){
     dict_clear_error();
 
     uint32_t cell = get_key_cell(dict, key);
-    if(cell == INVALID_CELL)
+    if(cell == DICT_INVALID_CELL)
         return NULL;
 
-    return dict->entries[cell]->value;
+    return dict->entries[cell].value;
 }
 
 /// @brief Internal function to insert a key-value pair into the dictionary.
@@ -143,28 +141,30 @@ INTERNAL int dict_put(Dict *dict, char *key, DictValue *item){
     assert(item != NULL);
     
     uint32_t cell = get_empty_cell(dict, key);
-    if(cell == INVALID_CELL)
+    if(cell == DICT_INVALID_CELL)
         return 0;
     
-    DictEntry *entry = malloc(sizeof(*entry));
-    if (entry == NULL) SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
-    
-    entry->key = malloc(strlen(key)+1);
-    if(entry->key == NULL) {
-        free_entry(entry);
+    DictEntry entry = dict->entries[cell];
+    if(entry.state != CELL_EMPTY)
+        SET_ERROR_AND_RETURN(DICT_ERR_ALR_INSERTED, 0);
+
+    entry.state = CELL_OCCUPIED;
+    entry.key = malloc(strlen(key)+1);
+    if(entry.key == NULL) {
+        free_entry(&entry);
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
     }
 
-    entry->value = calloc(1, sizeof(*entry->value));
-    if(entry->value == NULL) {
-        free_entry(entry);
+    entry.value = calloc(1, sizeof(*entry.value));
+    if(entry.value == NULL) {
+        free_entry(&entry);
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
     }
 
-    strcpy(entry->key, key);
-    dict_value_copy(entry->value, item);
+    strcpy(entry.key, key);
+    dict_value_copy(entry.value, item);
 
-    assert(dict->entries[cell] == NULL);
+    assert(dict->entries[cell].state == CELL_EMPTY);
     
     dict->size++;
     dict->entries[cell] = entry;
@@ -199,7 +199,7 @@ Dict *dict_create(uint32_t capacity){
 
     d->size = 0;
     d->capacity = capacity;
-    d->entries = calloc(capacity, sizeof(DictEntry*));
+    d->entries = calloc(capacity, sizeof(DictEntry));
     d->hfn = double_hash; // TESTING COLLISION 
     if (d->entries == NULL) {
         dict_destroy(d);
@@ -473,52 +473,20 @@ int dict_take(Dict *dict, char *key, DictValue *out){
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
     uint32_t cell = get_key_cell(dict, key); 
-    if(cell == INVALID_CELL)
+    if(cell == DICT_INVALID_CELL)
         return 0;
         
     DictValue *val = get_dict_value(dict, key);
-
     dict_value_copy(out, val);
 
-    free_entry(dict->entries[cell]);
-    dict->entries[cell] = NULL;
+    free_entry(&dict->entries[cell]);
+    dict->entries[cell].state = CELL_TOMBSTONE;
     dict->size--;
 
     return 1;
 }
 
 /* ========== END API GET/TAKE IMPLEMENTATIONS ========== */
-
-/**
- * Removes all entries from the dictionary.
- * 
- * @param dict Dictionary to clear (can be NULL)
- * 
- * @note Frees all internal entries and their associated memory
- * @note The dictionary remains valid and reusable after cleanup
- * @note Size is reset to 0
- * @note Capacity remains unchanged
- * @note If dict is NULL, function returns immediately with no action
- * @note This function does not set error state
- * 
- * @example
- *   dict_cleanup(d);  // Dictionary is now empty but still usable
- *   dict_put_int(d, "new_key", 42);  // Can insert again
- */
-void dict_cleanup(Dict *dict){
-    if(dict == NULL) return;
-    if(is_empty(dict)) return;
-
-    for(uint32_t i = 0; i < dict->capacity; i++){
-        if (!dict->entries[i])
-            continue;
-
-        free_entry(dict->entries[i]);
-        dict->entries[i] = NULL;
-    }
-    
-    dict->size = 0;
-}
 
 /**
  * Destroys the dictionary and releases all resources.
@@ -536,11 +504,17 @@ void dict_cleanup(Dict *dict){
  *   dict_destroy(d);
  *   d = NULL;  // Good practice to NULL the pointer after destroy
  */
-void dict_destroy(Dict *dict){        
+void dict_destroy(Dict *dict){
     if(dict == NULL) return;
+    if(is_empty(dict)) return;
 
-    dict_cleanup(dict);
+    for(uint32_t i = 0; i < dict->capacity; i++){
+        if (dict->entries[i].state == CELL_EMPTY)
+            continue;
 
+        free_entry(&dict->entries[i]);
+        
+    }
     free(dict->entries);
     free(dict);
 }

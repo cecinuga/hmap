@@ -7,7 +7,7 @@
 
 //9679
 /* ====== Dictionary constants. ====== */
-#define INVALID_CELL UINT32_MAX
+#define DICT_INVALID_CELL UINT32_MAX
 #define DICT_CAP 701
 #define DICT_HASH_PRIMARY "djb2"
 #define DICT_HASH_SECONDARY "fnv1a"
@@ -21,6 +21,12 @@ typedef enum {
     DICT_TYPE_STRING // char*
 } DictType;
 
+typedef enum {
+    CELL_EMPTY=0,
+    CELL_OCCUPIED,
+    CELL_TOMBSTONE
+} DictCellState;
+
 typedef struct {
     DictType type;
     union {
@@ -33,6 +39,7 @@ typedef struct {
 typedef struct {
     char *key;
     DictValue *value;
+    DictCellState state;
 } DictEntry;
 
 /* A simple dictionary.
@@ -42,7 +49,7 @@ typedef struct {
     uint32_t capacity; // How many items can store.
     DoubleHashFunction hfn; // Hash function used internally
 
-    DictEntry **entries; // List of items.
+    DictEntry *entries; // List of items.
 } Dict;
 
 #endif

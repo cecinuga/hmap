@@ -196,7 +196,6 @@ These choices are intentional to keep the implementation simple and
 predictable.
 
 ## 📌 Todo List
-- 🔴 [dict.c] add tombstone handling
 - 🔴 [dict.c] implement a proper resizing strategy for the hash table.
 - 🔴 [hash.c] add support for custom hash functions provided by the user
 - 🟠 [dict.c] create another Dict type where it stores only void* ptr in items.

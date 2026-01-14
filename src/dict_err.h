@@ -13,7 +13,8 @@ typedef enum {
     DICT_ERR_ALR_INSERTED,    // Key already inserted
     DICT_ERR_NOT_FOUND,       // Key not found
     DICT_ERR_DICT_FULL,       // Dict is full
-    DICT_ERR_INVALID_CAPACITY // Capacity = 0 in dict_create
+    DICT_ERR_INVALID_CAPACITY, // Capacity = 0 in dict_create
+    DICT_ERR_GENERIC
 } DictError;
 
 extern _Thread_local DictError g_last_error;

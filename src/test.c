@@ -18,15 +18,18 @@ int collision_test(){
 
         uint32_t cell = get_empty_cell(dict, key);
         int res = dict_put_int(dict, key, i);
-        if(!res) return 0;
+        if(!res) {
+          printf("%s\n", dict_error_string(dict_last_error()));
+          return 0;
+        }
 
         //printf("key: %s, cell: %zu, state: %d, size: %d\n", key, cell, visited[cell], dict->size);
         assert(!visited[cell]);
 
         visited[cell] = 1;
     }
-
     dict_destroy(dict);
+    
     return 1;
 }
 
@@ -37,9 +40,11 @@ int succ_full_dict_test(){
       char key[16];
       sprintf(key, "key_%d", i+1);
 
-      uint32_t cell = get_empty_cell(dict, key);
       int res = dict_put_int(dict, key, i);
-      if(!res) return 0;
+      if(!res) {
+        printf("%s\n", dict_error_string(dict_last_error()));
+        return 0;
+      }
   }
 
   assert(dict->size == DICT_CAP);
@@ -53,13 +58,13 @@ int fail_full_dict_test(){
     for (uint32_t i = 0; i < DICT_CAP+1; i++) {
         char key[16];
         sprintf(key, "key_%d", i+1);
-
-        uint32_t cell = get_empty_cell(dict, key);
         int res = dict_put_int(dict, key, i);
         
         if(!res){
           if(i == DICT_CAP && dict_last_error() == DICT_ERR_DICT_FULL)
             return 1;
+
+          printf("%s\n", dict_error_string(dict_last_error()));
           return 0;
         }
     }
@@ -98,6 +103,8 @@ int fail_put_full_test(){
         if(!res){
           if(i == DICT_CAP && dict_last_error() == DICT_ERR_DICT_FULL)
             return 1;
+
+          printf("%s\n", dict_error_string(dict_last_error()));
           return 0;
         }
 
@@ -118,7 +125,10 @@ int succ_take_all_test(){
     sprintf(key, "key_%d", i+1);
 
     int res = dict_put_int(dict, key, i);
-    if(!res) return 0;
+    if(!res) {
+      printf("%s\n", dict_error_string(dict_last_error()));
+      return 0;
+    }
 
     assert(res);
   }
@@ -154,7 +164,10 @@ int fail_take_all_test(){ //STILL IN WIP
     sprintf(key, "key_%d", i+1);
 
     int res = dict_put_int(dict, key, i);
-    if(!res) return 0;
+    if(!res) {
+      printf("%s\n", dict_error_string(dict_last_error()));
+      return 0;
+    }
 
     assert(res);
   }
@@ -168,6 +181,8 @@ int fail_take_all_test(){ //STILL IN WIP
     if(!res){
       if(dict_last_error() == DICT_ERR_NOT_FOUND && i == 20)
         return 1;
+
+      printf("%s\n", dict_error_string(dict_last_error()));
       return 0;
     }
 

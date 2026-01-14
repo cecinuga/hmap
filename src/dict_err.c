@@ -31,6 +31,6 @@ const char *dict_error_string(DictError err) {
         case DICT_ERR_DICT_FULL:
             return "Dictionary is full - no more insertion";
         default:
-            return "Unknown error";
+            return "Generic error";
     }
 }

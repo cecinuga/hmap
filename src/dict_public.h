@@ -15,7 +15,6 @@ int dict_upd_double(Dict *dict, char *key, double val);
 int dict_upd_string(Dict *dict, char *key, char *val);
 int dict_take(Dict *dict, char *key, DictValue *out);
 int dict_get(Dict *dict, char *key, DictValue *out);
-void dict_cleanup(Dict *dict);
 void dict_destroy(Dict *dict);
 
 #endif

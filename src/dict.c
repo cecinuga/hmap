@@ -14,12 +14,14 @@
 /// @note Asserts if entry is NULL
 /// @note Frees key, value, and string data if type is DICT_TYPE_STRING
 INTERNAL void free_entry(DictEntry *entry){
-    assert(entry != NULL);
-    if(entry->value->type==DICT_TYPE_STRING && entry->value->s != NULL)
+    if(entry == NULL) return;
+    if(entry->value && entry->value->type == DICT_TYPE_STRING)
         free(entry->value->s);
 
     free(entry->key);
     free(entry->value);
+    entry->key = NULL,
+    entry->value = NULL;
 }
 
 /// @brief Perform deep-copy of `src` into `dest`.
@@ -27,8 +29,9 @@ INTERNAL void free_entry(DictEntry *entry){
 /// @param src Source value (must not be NULL)
 /// @note Asserts if either parameter is NULL
 /// @note For DICT_TYPE_STRING, allocates memory that must be freed by caller
-INTERNAL void dict_value_copy(DictValue *dest, const DictValue *src){
-    assert(dest && src);
+INTERNAL void dict_value_copy(DictValue *dest, DictValue *src){
+    assert(dest);
+    assert(src);
 
     dest->type = src->type;
     switch (src->type) {
@@ -41,6 +44,7 @@ INTERNAL void dict_value_copy(DictValue *dest, const DictValue *src){
         break;
 
     case DICT_TYPE_STRING:
+        free(dest->s);
         dest->s = malloc(strlen(src->s) + 1);
         assert(dest->s);
         strcpy(dest->s, src->s);
@@ -73,6 +77,7 @@ INTERNAL int is_empty(Dict *dict){
 /// @param key Key string (must not be NULL)
 /// @return cell on success, DICT_INVALID_CELL otherwise
 INTERNAL uint32_t get_empty_cell(Dict *dict, char *key){
+    dict_clear_error();
     uint32_t i = 0;
     uint32_t cell = dict->hfn(key, i, dict->capacity);
         
@@ -95,18 +100,19 @@ INTERNAL uint32_t get_empty_cell(Dict *dict, char *key){
 /// @param key Key string (must not be NULL)
 /// @return cell on success, DICT_INVALID_CELL otherwise
 INTERNAL uint32_t get_key_cell(Dict *dict, char *key){
+    dict_clear_error();
     uint32_t cell, i = 0;
     do {
         cell = dict->hfn(key, i, dict->capacity);
         i++;
+        if(dict->entries[cell].state == CELL_EMPTY)
+            SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, DICT_INVALID_CELL);
         if(i == dict->capacity)
             SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, DICT_INVALID_CELL);
-    } while(!is_avaible(dict, cell) && strcmp(dict->entries[cell].key, key) != 0);
+    } while(!(dict->entries[cell].state==CELL_OCCUPIED && strcmp(dict->entries[cell].key, key) == 0));
    
     assert(cell < dict->capacity);
-    if (is_avaible(dict, cell))
-        SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, DICT_INVALID_CELL);
-    
+
     return cell;
 }
 
@@ -115,63 +121,20 @@ INTERNAL uint32_t get_key_cell(Dict *dict, char *key){
 /// @param key Key string (must not be NULL)
 /// @note The value is a shallow copy so will be freed with dict_destroy().
 /// @return DictValue on success, NULL otherwise
-INTERNAL DictValue *get_dict_value(Dict *dict, char *key){
+INTERNAL DictEntry *get_dict_entry(Dict *dict, char *key){
+    dict_clear_error();
     assert(dict);
     assert(key);
-    dict_clear_error();
 
     uint32_t cell = get_key_cell(dict, key);
     if(cell == DICT_INVALID_CELL)
-        return NULL;
-
-    return dict->entries[cell].value;
-}
-
-/// @brief Internal function to insert a key-value pair into the dictionary.
-/// @param dict Dictionary pointer (must not be NULL)
-/// @param key Key string (must not be NULL)
-/// @param item Value to insert (must not be NULL)
-/// @return 1 on success, 0 on failure
-/// @note Asserts if any parameter is NULL
-/// @note Clears error state at start
-INTERNAL int dict_put(Dict *dict, char *key, DictValue *item){   
-    dict_clear_error();
-    assert(dict != NULL);
-    assert(key != NULL);
-    assert(item != NULL);
+        SET_ERROR_AND_RETURN(dict_last_error(), NULL);
     
-    uint32_t cell = get_empty_cell(dict, key);
-    if(cell == DICT_INVALID_CELL)
-        return 0;
-    
-    DictEntry entry = dict->entries[cell];
-    if(entry.state != CELL_EMPTY)
-        SET_ERROR_AND_RETURN(DICT_ERR_ALR_INSERTED, 0);
+    DictEntry *entry = &dict->entries[cell];
+    if(entry->state != CELL_OCCUPIED)
+        SET_ERROR_AND_RETURN(DICT_ERR_GENERIC, NULL);
 
-    entry.state = CELL_OCCUPIED;
-    entry.key = malloc(strlen(key)+1);
-    if(entry.key == NULL) {
-        free_entry(&entry);
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
-    }
-
-    entry.value = calloc(1, sizeof(*entry.value));
-    if(entry.value == NULL) {
-        free_entry(&entry);
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
-    }
-
-    strcpy(entry.key, key);
-    dict_value_copy(entry.value, item);
-
-    assert(dict->entries[cell].state == CELL_EMPTY);
-    
-    dict->size++;
-    dict->entries[cell] = entry;
-
-    assert(dict->size <= dict->capacity);
-
-    return 1;
+    return &dict->entries[cell];
 }
 
 /**
@@ -209,6 +172,36 @@ Dict *dict_create(uint32_t capacity){
     return d;
 }
 
+INTERNAL DictEntry *dict_put(Dict *dict, char *key){
+    dict_clear_error();
+    assert(dict != NULL);
+    assert(key != NULL);
+    uint32_t cell = get_empty_cell(dict, key);
+    if(cell == DICT_INVALID_CELL){
+        SET_ERROR_AND_RETURN(dict_last_error(), NULL);
+    }
+    DictEntry *entry = &dict->entries[cell];
+    assert(entry->state == CELL_EMPTY);
+    entry->state = CELL_OCCUPIED;
+
+    entry->key = malloc(strlen(key));
+    if(entry->key==NULL){
+        free_entry(entry);
+        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
+    }
+    strcpy(entry->key, key);
+
+    entry->value = malloc(sizeof(*entry->value));
+    if(entry->value==NULL){
+        free_entry(entry);
+        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
+    }
+    dict->size++;
+    assert(dict->size <= dict->capacity);
+
+    return entry;
+}
+
 /**
  * Inserts an integer value into the dictionary.
  * 
@@ -230,17 +223,16 @@ int dict_put_int(Dict *dict, char *key, int val){
     if(dict == NULL || key == NULL) 
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    DictValue *dval = malloc(sizeof(*dval));
-    if(dval == NULL) 
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
+    DictEntry *entry = dict_put(dict, key);
+    if(entry == NULL){
+        free_entry(entry);
+        return 0;
+    }
 
-    dval->type = DICT_TYPE_INT;
-    dval->i = val;
+    entry->value->type = DICT_TYPE_INT;
+    entry->value->i = val;
 
-    int res = dict_put(dict, key, dval);
-    free(dval);
-
-    return res;
+    return 1;
 }
 
 /**
@@ -262,19 +254,18 @@ int dict_put_int(Dict *dict, char *key, int val){
 int dict_put_double(Dict *dict, char *key, double val){
     dict_clear_error();
     if(dict == NULL || key == NULL) 
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
+        SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    DictValue *dval = malloc(sizeof(*dval));
-    if(dval == NULL)
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
+    DictEntry *entry = dict_put(dict, key);
+    if(entry == NULL){
+        free_entry(entry);
+        return 0;
+    }
 
-    dval->type = DICT_TYPE_DOUBLE;
-    dval->d = val;
+    entry->value->type = DICT_TYPE_DOUBLE;
+    entry->value->d = val;
 
-    int res = dict_put(dict, key, dval);
-    free(dval);
-
-    return res;
+    return 1;
 }
 
 /**
@@ -293,26 +284,25 @@ int dict_put_double(Dict *dict, char *key, double val){
  *   }
  */
 int dict_put_string(Dict *dict, char *key, char *val){
-    dict_clear_error();    
-    if(dict == NULL || key == NULL || val == NULL) 
+    dict_clear_error();
+    if(dict == NULL || key == NULL) 
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    DictValue *dval = malloc(sizeof(*dval));
-    if(dval == NULL) 
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
-
-    dval->type = DICT_TYPE_STRING;
-    dval->s = strdup(val);
-    if(dval->s == NULL) {
-        free(dval);  
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
+    DictEntry *entry = dict_put(dict, key);
+    if(entry == NULL){
+        free_entry(entry);
+        return 0;
     }
 
-    int res = dict_put(dict, key, dval);
-    free(dval->s);
-    free(dval);   
+    entry->value->type = DICT_TYPE_STRING;
+    entry->value->s = malloc(strlen(val)+1);
+    if(entry->value->s == NULL){
+        free_entry(entry);
+        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
+    }
+    strcpy(entry->value->s, val);
 
-    return res;
+    return 1;
 }
 
 /* ========== END API INSERT IMPLEMENTATIONS ========== */
@@ -335,13 +325,13 @@ int dict_upd_int(Dict *dict, char *key, int val){
     if(dict == NULL || key == NULL) 
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    DictValue *old = get_dict_value(dict, key);
+    DictEntry *old = get_dict_entry(dict, key);
     if(old == NULL) return 0;
 
-    if(old->type != DICT_TYPE_INT)
+    if(old->value->type != DICT_TYPE_INT)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
 
-    old->i = val;
+    old->value->i = val;
 
     return 1;
 }
@@ -361,13 +351,13 @@ int dict_upd_double(Dict *dict, char *key, double val){
     if(dict == NULL || key == NULL) 
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    DictValue *old = get_dict_value(dict, key);
+    DictEntry *old = get_dict_entry(dict, key);
     if(old == NULL) return 0;
 
-    if(old->type != DICT_TYPE_DOUBLE)
+    if(old->value->type != DICT_TYPE_DOUBLE)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
 
-    old->d = val;
+    old->value->d = val;
 
     return 1;
 }
@@ -388,22 +378,20 @@ int dict_upd_string(Dict *dict, char *key, char *val){
     if(dict == NULL || key == NULL) 
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
-    DictValue *old = get_dict_value(dict, key);
+    DictEntry *old = get_dict_entry(dict, key);
     if(old == NULL) return 0;
 
-    if(old->type != DICT_TYPE_STRING)
+    if(old->value->type != DICT_TYPE_STRING)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
 
     size_t len = strlen(val) + 1;
-    char *tmp = realloc(old->s, len);
+    char *tmp = realloc(old->value->s, len);
     if (!tmp) {
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
     }
 
-    old->s = tmp;
-    strcpy(old->s, val);
-
-    strcpy(old->s, val);
+    old->value->s = tmp;
+    strcpy(old->value->s, val);
 
     return 1;
 }
@@ -433,13 +421,14 @@ int dict_upd_string(Dict *dict, char *key, char *val){
  *   }
  */
 int dict_get(Dict *dict, char *key, DictValue *out){
+    dict_clear_error(); 
     if(dict == NULL || key == NULL)
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
         
-    DictValue *val = get_dict_value(dict, key);
-    if(val == NULL) return 0;
+    DictEntry *entry = get_dict_entry(dict, key);
+    if(entry->value == NULL) return 0;
     
-    dict_value_copy(out, val);
+    dict_value_copy(out, entry->value);
 
     return 1;
 }
@@ -471,16 +460,16 @@ int dict_take(Dict *dict, char *key, DictValue *out){
     dict_clear_error();    
     if(dict == NULL || key == NULL || out == NULL)
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
-
-    uint32_t cell = get_key_cell(dict, key); 
-    if(cell == DICT_INVALID_CELL)
-        return 0;
         
-    DictValue *val = get_dict_value(dict, key);
-    dict_value_copy(out, val);
+    DictEntry *entry = get_dict_entry(dict, key);
+    if(entry == NULL)
+        SET_ERROR_AND_RETURN(dict_last_error(), 0);
 
-    free_entry(&dict->entries[cell]);
-    dict->entries[cell].state = CELL_TOMBSTONE;
+    dict_value_copy(out, entry->value);
+
+    free_entry(entry);
+    entry->state = CELL_TOMBSTONE;
+
     dict->size--;
 
     return 1;
@@ -506,15 +495,13 @@ int dict_take(Dict *dict, char *key, DictValue *out){
  */
 void dict_destroy(Dict *dict){
     if(dict == NULL) return;
-    if(is_empty(dict)) return;
-
-    for(uint32_t i = 0; i < dict->capacity; i++){
-        if (dict->entries[i].state == CELL_EMPTY)
-            continue;
-
-        free_entry(&dict->entries[i]);
+    if(!is_empty(dict))
+        for(uint32_t i = 0; i < dict->capacity; i++){
+            if (dict->entries[i].state == CELL_EMPTY)
+                continue;
+            free_entry(&dict->entries[i]);
+        }
         
-    }
     free(dict->entries);
     free(dict);
 }

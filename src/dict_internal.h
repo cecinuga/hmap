@@ -8,13 +8,13 @@
 #define INTERNAL static
 #endif
 
-INTERNAL void dict_value_copy(DictValue *dest, DictValue *src);
-INTERNAL int is_avaible(Dict *dict, uint32_t cell);
 INTERNAL int is_empty(Dict *dict);
 INTERNAL void free_entry(DictEntry *entry);
+INTERNAL void dict_value_copy(DictValue *dest, DictValue *src);
 INTERNAL uint32_t get_empty_cell(Dict *dict, char *key);
 INTERNAL uint32_t get_key_cell(Dict *dict, char *key);
 INTERNAL DictValue *get_dict_value(Dict *dict, char *key);
 INTERNAL DictEntry *dict_put(Dict *dict, char *key);
+INTERNAL DictCellState get_cell_state(Dict *dict, uint32_t cell);
 
 #endif

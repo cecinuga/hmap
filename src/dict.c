@@ -9,6 +9,15 @@
 #include "dict_public.h"
 #include "dict_err.h"
 
+/// @brief Checks if dictionary is empty.
+/// @param dict Dictionary pointer (must not be NULL)
+/// @return 1 if empty (size == 0), 0 otherwise
+/// @note Asserts if dict is NULL
+INTERNAL int is_empty(Dict *dict){
+    assert(dict != NULL);
+    return dict->size == 0;
+}
+
 /// @brief Frees all memory associated with a dictionary entry.
 /// @param entry Entry to free (must not be NULL)
 /// @note Asserts if entry is NULL
@@ -61,15 +70,6 @@ INTERNAL DictCellState get_cell_state(Dict *dict, uint32_t cell){
     assert(dict != NULL);
     assert(cell < dict->capacity);
     return dict->entries[cell].state;
-}
-
-/// @brief Checks if dictionary is empty.
-/// @param dict Dictionary pointer (must not be NULL)
-/// @return 1 if empty (size == 0), 0 otherwise
-/// @note Asserts if dict is NULL
-INTERNAL int is_empty(Dict *dict){
-    assert(dict != NULL);
-    return dict->size == 0;
 }
 
 /// @brief Finds an empty slot for a given key using **double hashing**.
@@ -175,6 +175,7 @@ INTERNAL DictEntry *dict_put(Dict *dict, char *key){
     dict_clear_error();
     assert(dict != NULL);
     assert(key != NULL);
+
     uint32_t cell = get_empty_cell(dict, key);
     if(cell == DICT_INVALID_CELL){
         SET_ERROR_AND_RETURN(dict_last_error(), NULL);
@@ -390,6 +391,12 @@ int dict_upd_string(Dict *dict, char *key, char *val){
     }
 
     old->value->s = tmp;
+    old->value->s = realloc(old->value->s, strlen(val)+1);
+    if(old->value->s == NULL){
+        free_entry(old);
+        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
+    }
+    
     strcpy(old->value->s, val);
 
     return 1;

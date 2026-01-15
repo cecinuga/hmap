@@ -57,10 +57,10 @@ INTERNAL void dict_value_copy(DictValue *dest, DictValue *src){
 /// @param cell Cell index to check (must be < dict->capacity)
 /// @return 1 if cell is NULL (available), 0 otherwise
 /// @note Asserts if dict is NULL or cell is out of bounds
-INTERNAL int is_avaible(Dict *dict, uint32_t cell){
+INTERNAL DictCellState get_cell_state(Dict *dict, uint32_t cell){
     assert(dict != NULL);
     assert(cell < dict->capacity);
-    return dict->entries[cell].state == CELL_EMPTY ? 1: 0;
+    return dict->entries[cell].state;
 }
 
 /// @brief Checks if dictionary is empty.
@@ -81,7 +81,7 @@ INTERNAL uint32_t get_empty_cell(Dict *dict, char *key){
     uint32_t i = 0;
     uint32_t cell = dict->hfn(key, i, dict->capacity);
         
-    while(!is_avaible(dict, cell)){
+    while(get_cell_state(dict, cell) != CELL_EMPTY){
         if(strcmp(dict->entries[cell].key, key) == 0)
             SET_ERROR_AND_RETURN(DICT_ERR_ALR_INSERTED, DICT_INVALID_CELL);
         if(i == dict->capacity){
@@ -105,11 +105,11 @@ INTERNAL uint32_t get_key_cell(Dict *dict, char *key){
     do {
         cell = dict->hfn(key, i, dict->capacity);
         i++;
-        if(dict->entries[cell].state == CELL_EMPTY)
+        if(get_cell_state(dict, cell) == CELL_EMPTY)
             SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, DICT_INVALID_CELL);
         if(i == dict->capacity)
             SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, DICT_INVALID_CELL);
-    } while(!(dict->entries[cell].state==CELL_OCCUPIED && strcmp(dict->entries[cell].key, key) == 0));
+    } while(!(get_cell_state(dict, cell) == CELL_OCCUPIED && strcmp(dict->entries[cell].key, key) == 0));
    
     assert(cell < dict->capacity);
 
@@ -130,8 +130,7 @@ INTERNAL DictEntry *get_dict_entry(Dict *dict, char *key){
     if(cell == DICT_INVALID_CELL)
         SET_ERROR_AND_RETURN(dict_last_error(), NULL);
     
-    DictEntry *entry = &dict->entries[cell];
-    if(entry->state != CELL_OCCUPIED)
+    if(get_cell_state(dict, cell) != CELL_OCCUPIED)
         SET_ERROR_AND_RETURN(DICT_ERR_GENERIC, NULL);
 
     return &dict->entries[cell];
@@ -181,7 +180,7 @@ INTERNAL DictEntry *dict_put(Dict *dict, char *key){
         SET_ERROR_AND_RETURN(dict_last_error(), NULL);
     }
     DictEntry *entry = &dict->entries[cell];
-    assert(entry->state == CELL_EMPTY);
+    assert(get_cell_state(dict, cell) == CELL_EMPTY);
     entry->state = CELL_OCCUPIED;
 
     entry->key = malloc(strlen(key));
@@ -497,7 +496,7 @@ void dict_destroy(Dict *dict){
     if(dict == NULL) return;
     if(!is_empty(dict))
         for(uint32_t i = 0; i < dict->capacity; i++){
-            if (dict->entries[i].state == CELL_EMPTY)
+            if (get_cell_state(dict, i) == CELL_EMPTY)
                 continue;
             free_entry(&dict->entries[i]);
         }

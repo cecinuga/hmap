@@ -20,6 +20,7 @@ int collision_test(){
         int res = dict_put_int(dict, key, i);
         if(!res) {
           printf("%s\n", dict_error_string(dict_last_error()));
+          dict_destroy(dict);
           return 0;
         }
 
@@ -28,8 +29,8 @@ int collision_test(){
 
         visited[cell] = 1;
     }
+    free(visited);
     dict_destroy(dict);
-    
     return 1;
 }
 
@@ -43,6 +44,7 @@ int succ_full_dict_test(){
       int res = dict_put_int(dict, key, i);
       if(!res) {
         printf("%s\n", dict_error_string(dict_last_error()));
+        dict_destroy(dict);
         return 0;
       }
   }
@@ -61,6 +63,7 @@ int fail_full_dict_test(){
         int res = dict_put_int(dict, key, i);
         
         if(!res){
+          dict_destroy(dict);
           if(i == DICT_CAP && dict_last_error() == DICT_ERR_DICT_FULL)
             return 1;
 
@@ -81,8 +84,10 @@ int succ_put_full_test(){
         sprintf(key, "key_%d", i+1);
 
         int res = dict_put_int(dict, key, i);
-        if(!res) return 0;
-
+        if(!res) {
+          dict_destroy(dict);
+          return 0;
+        }
         //printf("key: %s, cell: %zu, size: %d\n", key, cell, dict->size);
         assert(res);
     }
@@ -101,6 +106,7 @@ int fail_put_full_test(){
 
         int res = dict_put_int(dict, key, i);
         if(!res){
+          dict_destroy(dict);
           if(i == DICT_CAP && dict_last_error() == DICT_ERR_DICT_FULL)
             return 1;
 
@@ -126,6 +132,7 @@ int succ_take_all_test(){
 
     int res = dict_put_int(dict, key, i);
     if(!res) {
+      dict_destroy(dict);
       printf("%s\n", dict_error_string(dict_last_error()));
       return 0;
     }
@@ -141,6 +148,7 @@ int succ_take_all_test(){
     int res = dict_take(dict, key, &v);
     
     if(!res){
+      dict_destroy(dict);
       printf("%s: %s\n", dict_error_string(dict_last_error()), key);
       return 0;
     }
@@ -165,6 +173,7 @@ int fail_take_all_test(){ //STILL IN WIP
 
     int res = dict_put_int(dict, key, i);
     if(!res) {
+      dict_destroy(dict);
       printf("%s\n", dict_error_string(dict_last_error()));
       return 0;
     }
@@ -179,6 +188,7 @@ int fail_take_all_test(){ //STILL IN WIP
     DictValue v;
     int res = dict_take(dict, key, &v);
     if(!res){
+      dict_destroy(dict);
       if(dict_last_error() == DICT_ERR_NOT_FOUND && i == 20)
         return 1;
 

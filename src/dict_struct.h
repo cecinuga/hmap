@@ -22,7 +22,7 @@ typedef enum {
 } DictType;
 
 typedef enum {
-    CELL_EMPTY=0,
+    CELL_FREE=0,
     CELL_OCCUPIED,
     CELL_TOMBSTONE
 } DictCellState;

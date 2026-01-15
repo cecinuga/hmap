@@ -27,10 +27,14 @@ INTERNAL void free_entry(DictEntry *entry){
     if(entry->value && entry->value->type == DICT_TYPE_STRING)
         free(entry->value->s);
 
-    free(entry->key);
-    free(entry->value);
-    entry->key = NULL,
-    entry->value = NULL;
+    if(entry->key){
+        free(entry->key);
+        entry->key = NULL;
+    }
+    if(entry->value){
+        free(entry->value);
+        entry->value = NULL;
+    }
 }
 
 /// @brief Perform deep-copy of `src` into `dest`.
@@ -81,7 +85,7 @@ INTERNAL uint32_t get_empty_cell(Dict *dict, char *key){
     uint32_t i = 0;
     uint32_t cell = dict->hfn(key, i, dict->capacity);
         
-    while(get_cell_state(dict, cell) != CELL_EMPTY){
+    while(get_cell_state(dict, cell) != CELL_FREE){
         if(strcmp(dict->entries[cell].key, key) == 0)
             SET_ERROR_AND_RETURN(DICT_ERR_ALR_INSERTED, DICT_INVALID_CELL);
         if(i == dict->capacity){
@@ -105,7 +109,7 @@ INTERNAL uint32_t get_key_cell(Dict *dict, char *key){
     do {
         cell = dict->hfn(key, i, dict->capacity);
         i++;
-        if(get_cell_state(dict, cell) == CELL_EMPTY)
+        if(get_cell_state(dict, cell) == CELL_FREE)
             SET_ERROR_AND_RETURN(DICT_ERR_NOT_FOUND, DICT_INVALID_CELL);
         if(i == dict->capacity)
             SET_ERROR_AND_RETURN(DICT_ERR_DICT_FULL, DICT_INVALID_CELL);
@@ -181,11 +185,12 @@ INTERNAL DictEntry *dict_put(Dict *dict, char *key){
         SET_ERROR_AND_RETURN(dict_last_error(), NULL);
     }
     DictEntry *entry = &dict->entries[cell];
-    assert(get_cell_state(dict, cell) == CELL_EMPTY);
+    assert(get_cell_state(dict, cell) == CELL_FREE);
     entry->state = CELL_OCCUPIED;
 
     entry->key = malloc(strlen(key)+1);
     if(entry->key==NULL){
+        entry->state=CELL_FREE;
         free_entry(entry);
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
     }
@@ -193,6 +198,7 @@ INTERNAL DictEntry *dict_put(Dict *dict, char *key){
 
     entry->value = malloc(sizeof(*entry->value));
     if(entry->value==NULL){
+        entry->state=CELL_FREE;
         free_entry(entry);
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
     }
@@ -224,11 +230,8 @@ int dict_put_int(Dict *dict, char *key, int val){
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
     DictEntry *entry = dict_put(dict, key);
-    if(entry == NULL){
-        free_entry(entry);
-        return 0;
-    }
-
+    if(entry == NULL) return 0;
+    
     entry->value->type = DICT_TYPE_INT;
     entry->value->i = val;
 
@@ -257,10 +260,7 @@ int dict_put_double(Dict *dict, char *key, double val){
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
     DictEntry *entry = dict_put(dict, key);
-    if(entry == NULL){
-        free_entry(entry);
-        return 0;
-    }
+    if(entry == NULL) return 0;
 
     entry->value->type = DICT_TYPE_DOUBLE;
     entry->value->d = val;
@@ -289,14 +289,12 @@ int dict_put_string(Dict *dict, char *key, char *val){
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
 
     DictEntry *entry = dict_put(dict, key);
-    if(entry == NULL){
-        free_entry(entry);
-        return 0;
-    }
+    if(entry == NULL) return 0;
 
     entry->value->type = DICT_TYPE_STRING;
     entry->value->s = malloc(strlen(val)+1);
     if(entry->value->s == NULL){
+        entry->state = CELL_FREE;
         free_entry(entry);
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
     }
@@ -385,12 +383,9 @@ int dict_upd_string(Dict *dict, char *key, char *val){
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
 
     char *tmp = realloc(old->value->s, strlen(val) + 1);
-    if (!tmp) {
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
-    }
+    if (!tmp) SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
 
     old->value->s = tmp;
-    
     strcpy(old->value->s, val);
 
     return 1;
@@ -462,8 +457,7 @@ int dict_take(Dict *dict, char *key, DictValue *out){
         SET_ERROR_AND_RETURN(DICT_ERR_NULL_ARG, 0);
         
     DictEntry *entry = get_dict_entry(dict, key);
-    if(entry == NULL)
-        SET_ERROR_AND_RETURN(dict_last_error(), 0);
+    if(entry == NULL) SET_ERROR_AND_RETURN(dict_last_error(), 0);
 
     dict_value_copy(out, entry->value);
 
@@ -497,7 +491,7 @@ void dict_destroy(Dict *dict){
     if(dict == NULL) return;
     if(!is_empty(dict))
         for(uint32_t i = 0; i < dict->capacity; i++){
-            if (get_cell_state(dict, i) == CELL_EMPTY)
+            if (get_cell_state(dict, i) == CELL_FREE)
                 continue;
             free_entry(&dict->entries[i]);
         }

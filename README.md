@@ -169,6 +169,40 @@ Planned tasks (see in-code TODOs): resizing, user-provided hash functions, and a
 
 ------------------------------------------------------------------------
 
+## Valgrind
+To ensure there are no memory leaks, run the following command after building the app:
+
+```c
+valgrind --leak-check=full --show-leak-kinds=all ./build/app
+```
+
+This is my Valgrind output updated to commit ```c4117c01```:
+```c
+==1145755== Memcheck, a memory error detector
+==1145755== Copyright (C) 2002-2024, and GNU GPL'd, by Julian Seward et al.
+==1145755== Using Valgrind-3.23.0 and LibVEX; rerun with -h for copyright info
+==1145755== Command: ./build/app __
+==1145755== 
+[+] Success collion test.
+[+] Success succ_full_dict_test.
+[+] Success fail_full_dict_test.
+[+] Success succ_put_full_test.
+[+] Success fail_put_full_test.
+[+] Success succ_take_all_test.
+[+] Success fail_take_all_test.
+==1145755== 
+==1145755== HEAP SUMMARY:
+==1145755==     in use at exit: 0 bytes in 0 blocks
+==1145755==   total heap usage: 8,628 allocs, 8,628 frees, 224,381 bytes allocated
+==1145755== 
+==1145755== All heap blocks were freed -- no leaks are possible
+==1145755== 
+==1145755== For lists of detected and suppressed errors, rerun with: -s
+==1145755== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+```
+
+------------------------------------------------------------------------
+
 ## 📌 Todo List
 - 🔴 [dict.c] implement a proper resizing strategy for the hash table.
 - 🔴 [hash.c] add support for custom hash functions provided by the user

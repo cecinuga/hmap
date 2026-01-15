@@ -184,7 +184,7 @@ INTERNAL DictEntry *dict_put(Dict *dict, char *key){
     assert(get_cell_state(dict, cell) == CELL_EMPTY);
     entry->state = CELL_OCCUPIED;
 
-    entry->key = malloc(strlen(key));
+    entry->key = malloc(strlen(key)+1);
     if(entry->key==NULL){
         free_entry(entry);
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, NULL);
@@ -384,18 +384,12 @@ int dict_upd_string(Dict *dict, char *key, char *val){
     if(old->value->type != DICT_TYPE_STRING)
         SET_ERROR_AND_RETURN(DICT_ERR_MIS_TYPE, 0);
 
-    size_t len = strlen(val) + 1;
-    char *tmp = realloc(old->value->s, len);
+    char *tmp = realloc(old->value->s, strlen(val) + 1);
     if (!tmp) {
         SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
     }
 
     old->value->s = tmp;
-    old->value->s = realloc(old->value->s, strlen(val)+1);
-    if(old->value->s == NULL){
-        free_entry(old);
-        SET_ERROR_AND_RETURN(DICT_ERR_NOMEM, 0);
-    }
     
     strcpy(old->value->s, val);
 

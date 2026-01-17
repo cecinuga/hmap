@@ -1,4 +1,5 @@
-app
+.vscode
+build/test
 
 # Prerequisites
 *.d

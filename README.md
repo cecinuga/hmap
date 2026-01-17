@@ -204,7 +204,7 @@ This is my Valgrind output updated to commit ```c4117c01```:
 ------------------------------------------------------------------------
 
 ## 📌 Todo List
-- 🔴 [dict.c] implement proper unit test via make
+- 🔴 [dict.c] implement valgrind via make
 - 🔴 [dict.c] implement a proper resizing strategy for the hash table.
 - 🔴 [hash.c] add support for custom hash functions provided by the user
 - 🟠 [dict.c] add thread-safety mechanisms (e.g., mutexes)

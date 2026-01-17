@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdint.h>
-#include "utils.h"
 #include "hash.h"
 
 uint64_t hash_djb2(const char *str){

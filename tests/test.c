@@ -266,3 +266,10 @@ int run_tests(){
 
   return 1;
 }
+
+int main(void){
+
+    run_tests();
+
+    return 0;
+}
